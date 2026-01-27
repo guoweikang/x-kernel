@@ -33,6 +33,7 @@
 #     - `IP`: ArceOS IPv4 address (default is 10.0.2.15 for QEMU user netdev)
 #     - `GW`: Gateway IPv4 address (default is 10.0.2.2 for QEMU user netdev)
 
+export DWARF := y
 # General options
 ARCH ?= aarch64
 MYPLAT ?=
@@ -41,7 +42,6 @@ SMP ?=
 MODE ?= release
 LOG ?= warn
 V ?=
-DWARF ?= 
 LTO ?=
 TARGET_DIR ?= $(PWD)/target
 EXTRA_CONFIG ?=
