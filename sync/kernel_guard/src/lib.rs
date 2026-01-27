@@ -37,17 +37,18 @@
 //!     fn enable_preempt() {
 //!         // Your implementation here
 //!     }
+//!
 //!     fn disable_preempt() {
 //!         // Your implementation here
 //!     }
 //! }
 //!
 //! let guard = NoPreempt::new();
-//! /* The critical section starts here
-//!
-//! Do something that requires preemption to be disabled
-//!
-//! The critical section ends here */
+//! // The critical section starts here
+//! //
+//! // Do something that requires preemption to be disabled
+//! //
+//! // The critical section ends here
 //! drop(guard);
 //! ```
 
@@ -118,7 +119,9 @@ cfg_if::cfg_if! {
 
 impl BaseGuard for NoOp {
     type State = ();
+
     fn acquire() -> Self::State {}
+
     fn release(_state: Self::State) {}
 }
 
@@ -154,11 +157,13 @@ mod imp {
 
     impl BaseGuard for NoPreempt {
         type State = ();
+
         fn acquire() -> Self::State {
             // disable preempt
             #[cfg(feature = "preempt")]
             crate_interface::call_interface!(KernelGuardIf::disable_preempt);
         }
+
         fn release(_state: Self::State) {
             // enable preempt
             #[cfg(feature = "preempt")]
@@ -168,6 +173,7 @@ mod imp {
 
     impl BaseGuard for NoPreemptIrqSave {
         type State = usize;
+
         fn acquire() -> Self::State {
             // disable preempt
             #[cfg(feature = "preempt")]
@@ -175,6 +181,7 @@ mod imp {
             // disable IRQs and save IRQ states
             super::arch::local_irq_save_and_disable()
         }
+
         fn release(state: Self::State) {
             // restore IRQ states
             super::arch::local_irq_restore(state);
