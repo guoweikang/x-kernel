@@ -5,8 +5,10 @@ use core::mem::MaybeUninit;
 use axplat::mem::{PhysAddr, pa, phys_to_virt};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
-use x2apic::ioapic::IoApic;
-use x2apic::lapic::{LocalApic, LocalApicBuilder, xapic_base};
+use x2apic::{
+    ioapic::IoApic,
+    lapic::{LocalApic, LocalApicBuilder, xapic_base},
+};
 use x86_64::instructions::port::Port;
 
 use self::vectors::*;
@@ -183,7 +185,7 @@ mod irq_impl {
         }
 
         /// Sets the priority for a specific interrupt request (IRQ).
-        fn set_priority(irq: usize, priority: u8) {
+        fn set_priority(_irq: usize, _priority: u8) {
             todo!()
         }
 
@@ -193,17 +195,17 @@ mod irq_impl {
         }
 
         /// Restore irq status
-        fn local_irq_restore(flag: usize) {
+        fn local_irq_restore(_flag: usize) {
             todo!()
         }
 
         /// Allows the current CPU to respond to interrupts.
-        fn enable_irqs(){
+        fn enable_irqs() {
             todo!()
         }
 
         /// Makes the current CPU ignore interrupts.
-        fn disable_irqs(){
+        fn disable_irqs() {
             todo!()
         }
 

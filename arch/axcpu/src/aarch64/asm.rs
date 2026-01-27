@@ -3,8 +3,8 @@
 use core::arch::asm;
 
 use aarch64_cpu::{asm::barrier, registers::*};
+pub use axplat::irq::{disable_irqs, enable_irqs, irqs_enabled};
 use memaddr::{PhysAddr, VirtAddr};
-pub use axplat::irq::{enable_irqs, disable_irqs, irqs_enabled};
 
 /// Relaxes the current CPU and waits for interrupts.
 ///
