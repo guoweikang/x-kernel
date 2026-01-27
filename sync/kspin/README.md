@@ -137,6 +137,7 @@ impl KernelGuardIf for MyKernelGuard {
     
     fn local_irq_save_and_disable() -> usize {
         // Your implementation
+        0 // Return saved IRQ flags
     }
     
     fn local_irq_restore(flags: usize) {
