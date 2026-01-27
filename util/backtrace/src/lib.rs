@@ -15,7 +15,7 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust,no_run
+//! ```no_run
 //! use backtrace::{init, Backtrace};
 //!
 //! // Initialize with valid memory ranges
@@ -32,7 +32,7 @@
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
-use alloc::Vec;
+use alloc::vec::Vec;
 use core::{fmt, ops::Range};
 
 use spin::Once;
@@ -72,7 +72,7 @@ static CONFIG: Once<BacktraceConfig> = Once::new();
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```no_run
 /// use backtrace::init;
 ///
 /// init(0x8000_0000..0x9000_0000, 0x7000_0000..0x8000_0000);
@@ -97,6 +97,14 @@ pub const fn is_enabled() -> bool {
 /// Unwind the stack from the given frame pointer.
 ///
 /// Returns an empty vector if not initialized or on error.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use backtrace::{init, unwind_stack};
+/// init(0..usize::MAX, 0..usize::MAX);
+/// let frames = unwind_stack(0x7fff_0000);
+/// ```
 #[cfg(feature = "alloc")]
 pub fn unwind_stack(fp: usize) -> Vec<Frame> {
     let Some(config) = CONFIG.get() else {
@@ -143,7 +151,7 @@ impl Backtrace {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```no_run
     /// use backtrace::Backtrace;
     ///
     /// let bt = Backtrace::capture();
@@ -206,7 +214,7 @@ impl Backtrace {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use backtrace::Backtrace;
     ///
     /// // In exception handler

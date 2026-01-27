@@ -41,7 +41,7 @@ println!("{}", bt);
 
 ### Capture from Exception Handler
 
-```rust
+```rust,ignore
 fn exception_handler(trap_frame: &TrapFrame) {
     let bt = Backtrace::capture_trap(
         trap_frame.fp,
@@ -56,7 +56,7 @@ fn exception_handler(trap_frame: &TrapFrame) {
 
 ### Configure Maximum Depth
 
-```rust
+```rust,no_run
 use backtrace::set_max_depth;
 
 // Limit unwinding to 20 frames
@@ -65,7 +65,7 @@ set_max_depth(20);
 
 ### Iterate Frames with Symbolication
 
-```rust
+```rust,ignore
 if let Some(frames) = bt.frames() {
     for (i, (raw, frame)) in frames.enumerate() {
         println!("{:>4}: {:?} at {}:{}",

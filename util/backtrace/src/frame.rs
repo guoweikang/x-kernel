@@ -47,7 +47,7 @@ impl Frame {
     /// The caller must ensure that `fp` is valid and properly aligned.
     unsafe fn read_unchecked(fp: usize) -> Self {
         let offset = CurrentArch::FRAME_OFFSET;
-        (fp as *const Frame).sub(offset).read()
+        unsafe { (fp as *const Frame).sub(offset).read() }
     }
     
     /// Adjust the instruction pointer for symbolication.

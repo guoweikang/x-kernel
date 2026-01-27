@@ -1,7 +1,7 @@
 //! Stack unwinding implementation.
 
 #[cfg(feature = "alloc")]
-use alloc::{vec, vec::Vec};
+use alloc::vec::Vec;
 
 use crate::config::BacktraceConfig;
 use crate::error::{BacktraceError, Result};
