@@ -25,10 +25,7 @@
 //!    the preemption enable/disable operations will be no-ops. This feature is
 //!    disabled by default.
 //!
-//! # Examples
-//!
-//! ```
-//! use kernel_guard::{KernelGuardIf, NoPreempt};
+//! use kspin::guard::{KernelGuardIf, NoPreempt};
 //!
 //! struct KernelGuardIfImpl;
 //!
@@ -52,7 +49,6 @@
 //! drop(guard);
 //! ```
 
-#![no_std]
 
 mod arch;
 

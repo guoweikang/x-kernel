@@ -10,8 +10,7 @@ use core::{
 use axhal::percpu::this_cpu_id;
 use axsched::BaseScheduler;
 use futures_util::task::AtomicWaker;
-use kernel_guard::BaseGuard;
-use kspin::{SpinNoIrqGuard, SpinRaw};
+use kspin::{SpinNoIrqGuard, SpinRaw, BaseGuard};
 use lazyinit::LazyInit;
 
 use crate::{
@@ -240,7 +239,7 @@ impl<G: BaseGuard> AxRunQueueRef<'_, G> {
         assert!(task.is_ready());
         #[cfg(feature = "watchdog")]
         {
-            let _g = kernel_guard::NoPreempt::new();
+            let _g = kspin::NoPreempt::new();
             crate::global_task_queue::record_task_for_watchdog(&task);
         }
         self.inner.scheduler.lock().add_task(task);
@@ -337,7 +336,7 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
         assert!(curr.is_running());
 
         // When we call `preempt_resched()`, both IRQs and preemption must
-        // have been disabled by `kernel_guard::NoPreemptIrqSave`. So we need
+        // have been disabled by `kspin::NoPreemptIrqSave`. So we need
         // to set `current_disable_count` to 1 in `can_preempt()` to obtain
         // the preemption permission.
         let can_preempt = curr.can_preempt(1);
@@ -602,7 +601,7 @@ fn poll_gc(cx: &mut Context<'_>) -> Poll<()> {
 
         #[cfg(feature = "watchdog")]
         {
-            let _g = kernel_guard::NoPreempt::new();
+            let _g = kspin::NoPreempt::new();
             crate::global_task_queue::sweep_watchdog_tasks(this_cpu_id());
         }
 
@@ -630,7 +629,7 @@ fn poll_gc(cx: &mut Context<'_>) -> Poll<()> {
 /// then puts the task to the scheduler of target run queue.
 #[cfg(feature = "smp")]
 pub(crate) fn migrate_entry(migrated_task: AxTaskRef) {
-    select_run_queue::<kernel_guard::NoPreemptIrqSave>(&migrated_task)
+    select_run_queue::<kspin::NoPreemptIrqSave>(&migrated_task)
         .inner
         .scheduler
         .lock()

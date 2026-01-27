@@ -22,7 +22,6 @@ multitask = [
     "dep:crate_interface",
     "dep:event-listener",
     "dep:futures-util",
-    "dep:kernel_guard",
     "dep:kspin",
     "dep:lazyinit",
     "dep:memaddr",
@@ -31,7 +30,7 @@ multitask = [
 task-ext = ["dep:extern-trait"]
 irq = []
 tls = ["axhal/tls"]
-preempt = ["irq", "percpu?/preempt", "kernel_guard/preempt"]
+preempt = ["irq", "percpu?/preempt", "kspin/preempt"]
 smp = ["kspin/smp"]
 
 sched-fifo = ["multitask"]
@@ -56,7 +55,6 @@ futures-util = { version = "0.3", default-features = false, optional = true, fea
     "alloc",
     "async-await-macro",
 ] }
-kernel_guard = { workspace = true, optional = true }
 kspin = { workspace = true, optional = true }
 lazyinit = { workspace = true, optional = true }
 log.workspace = true

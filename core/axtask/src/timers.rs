@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use axhal::time::{TimeValue, wall_time};
-use kernel_guard::NoPreemptIrqSave;
+use kspin::NoPreemptIrqSave;
 
 percpu_static! {
     TIMER_CALLBACKS: Vec<Box<dyn Fn(TimeValue) + Send + Sync>> = Vec::new(),

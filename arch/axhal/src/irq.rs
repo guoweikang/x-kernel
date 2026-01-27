@@ -37,7 +37,7 @@ pub fn register_irq_hook(hook: fn(usize)) -> bool {
 /// Make sure called in an interrupt context or hypervisor VM exit handler.
 #[register_trap_handler(IRQ)]
 pub fn irq_handler(vector: usize) -> bool {
-    let guard = kernel_guard::NoPreempt::new();
+    let guard = kspin::NoPreempt::new();
 
     if let Some(irq) = handle(vector) {
         let hook = IRQ_HOOK.load(Ordering::SeqCst);

@@ -8,7 +8,7 @@ use core::sync::atomic::AtomicUsize;
 
 #[cfg(feature = "watchdog")]
 use axhal::context::TrapFrame;
-use kernel_guard::NoPreemptIrqSave;
+use kspin::NoPreemptIrqSave;
 
 pub(crate) use crate::run_queue::{current_run_queue, select_run_queue};
 #[doc(cfg(all(feature = "multitask", feature = "task-ext")))]
@@ -54,7 +54,7 @@ struct KernelGuardIfImpl;
 
 #[cfg(feature = "preempt")]
 #[crate_interface::impl_interface]
-impl kernel_guard::KernelGuardIf for KernelGuardIfImpl {
+impl kspin::KernelGuardIf for KernelGuardIfImpl {
     fn disable_preempt() {
         if let Some(curr) = current_may_uninit() {
             curr.disable_preempt();
@@ -121,10 +121,10 @@ pub fn init_scheduler_secondary() {
 #[cfg(feature = "irq")]
 #[doc(cfg(feature = "irq"))]
 pub fn on_timer_tick() {
-    use kernel_guard::NoOp;
+    use kspin::NoOp;
     crate::timers::check_events();
     // Since irq and preemption are both disabled here,
-    // we can get current run queue with the default `kernel_guard::NoOp`.
+    // we can get current run queue with the default `kspin::NoOp`.
     current_run_queue::<NoOp>().scheduler_timer_tick();
 }
 

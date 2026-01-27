@@ -64,7 +64,6 @@ axio = { path = "io/axio" }
 axpoll = { path = "core/axpoll" }
 memaddr = { path = "mm/memaddr" }
 memory_set = { path = "mm/memory_set" }
-kernel_guard = { path = "sync/kernel_guard" }
 kspin = { path = "sync/kspin" }
 
 # Starry Modules

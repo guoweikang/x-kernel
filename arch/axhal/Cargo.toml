@@ -67,7 +67,7 @@ axcpu = { workspace = true }
 axplat.workspace = true
 cfg-if.workspace = true
 heapless = "0.9"
-kernel_guard.workspace = true
+kspin.workspace = true
 lazyinit.workspace = true
 linkme = { version = "0.3.33", optional = true }
 log.workspace = true
