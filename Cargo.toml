@@ -32,7 +32,8 @@ axfeat = { path = "api/axfeat", features = [
 ] }
 
 axalloc = { path = "mm/axalloc" }
-axconfig = { path = "util/axconfig" }
+platconfig = { path = "util/platconfig" }
+platconfig-macros = { path = "util/platconfig-macros" }
 axdisplay = { path = "io/axdisplay" }
 axdriver = { path = "drivers/axdriver" }
 axdma = { path = "io/axdma" }
