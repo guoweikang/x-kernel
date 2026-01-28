@@ -2,13 +2,13 @@ mod fs;
 mod inode;
 mod util;
 
-#[allow(unused_imports)]
-use axdriver::{AxBlockDevice, prelude::BlockDriverOps};
 pub use fs::*;
 pub use inode::*;
+#[allow(unused_imports)]
+use kdriver::{BlockDevice as KBlockDevice, prelude::BlockDriverOps};
 use lwext4_rust::{BlockDevice, Ext4Error, Ext4Result, ffi::EIO};
 
-pub(crate) struct Ext4Disk(AxBlockDevice);
+pub(crate) struct Ext4Disk(KBlockDevice);
 
 impl BlockDevice for Ext4Disk {
     fn read_blocks(&mut self, block_id: u64, buf: &mut [u8]) -> Ext4Result<usize> {

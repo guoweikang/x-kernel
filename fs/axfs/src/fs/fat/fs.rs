@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
 use core::marker::PhantomPinned;
 
-use axdriver::AxBlockDevice;
 use axfs_ng_vfs::{
     DirEntry, Filesystem, FilesystemOps, Reference, StatFs, VfsResult, path::MAX_NAME_LEN,
 };
+use kdriver::BlockDevice as KBlockDevice;
 use kspin::{SpinNoPreempt as Mutex, SpinNoPreemptGuard as MutexGuard};
 use slab::Slab;
 
@@ -33,7 +33,7 @@ pub struct FatFilesystem {
 }
 
 impl FatFilesystem {
-    pub fn new(dev: AxBlockDevice) -> Filesystem {
+    pub fn new(dev: KBlockDevice) -> Filesystem {
         let mut inner = FatFilesystemInner {
             inner: ff::FileSystem::new(SeekableDisk::new(dev), fatfs::FsOptions::new())
                 .expect("failed to initialize FAT filesystem"),

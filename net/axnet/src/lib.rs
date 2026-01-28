@@ -36,7 +36,7 @@ mod wrapper;
 
 use alloc::{borrow::ToOwned, boxed::Box};
 
-use axdriver::{AxDeviceContainer, prelude::*};
+use kdriver::{DeviceContainer, prelude::*};
 use ksync::Mutex;
 use lazyinit::LazyInit;
 use smoltcp::wire::{EthernetAddress, Ipv4Address, Ipv4Cidr};
@@ -57,7 +57,7 @@ static SOCKET_SET: LazyInit<SocketSetWrapper> = LazyInit::new();
 static SERVICE: LazyInit<Mutex<Service>> = LazyInit::new();
 
 /// Initializes the network subsystem by NIC devices.
-pub fn init_network(mut net_devs: AxDeviceContainer<AxNetDevice>) {
+pub fn init_network(mut net_devs: DeviceContainer<NetDevice>) {
     info!("Initialize network subsystem...");
 
     let mut router = Router::new();
@@ -119,7 +119,7 @@ pub fn init_network(mut net_devs: AxDeviceContainer<AxNetDevice>) {
 
 /// Init vsock subsystem by vsock devices.
 #[cfg(feature = "vsock")]
-pub fn init_vsock(mut vsock_devs: AxDeviceContainer<AxVsockDevice>) {
+pub fn init_vsock(mut vsock_devs: DeviceContainer<VsockDevice>) {
     use crate::device::register_vsock_device;
     info!("Initialize vsock subsystem...");
     if let Some(dev) = vsock_devs.take_one() {

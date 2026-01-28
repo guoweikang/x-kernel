@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
 use core::cell::OnceCell;
 
-use axdriver::AxBlockDevice;
 use axfs_ng_vfs::{
     DirEntry, DirNode, Filesystem, FilesystemOps, Reference, StatFs, VfsResult, path::MAX_NAME_LEN,
 };
+use kdriver::BlockDevice as KBlockDevice;
 use kspin::{SpinNoPreempt as Mutex, SpinNoPreemptGuard as MutexGuard};
 use lwext4_rust::{FsConfig, ffi::EXT4_ROOT_INO};
 
@@ -21,7 +21,7 @@ pub struct Ext4Filesystem {
 }
 
 impl Ext4Filesystem {
-    pub fn new(dev: AxBlockDevice) -> VfsResult<Filesystem> {
+    pub fn new(dev: KBlockDevice) -> VfsResult<Filesystem> {
         let ext4 =
             lwext4_rust::Ext4Filesystem::new(Ext4Disk(dev), EXT4_CONFIG).map_err(into_vfs_err)?;
 
