@@ -7,10 +7,10 @@ use axdriver::prelude::{
 };
 use axerrno::{AxError, AxResult};
 use axfs_ng_vfs::{DeviceId, NodeFlags, NodeType, VfsResult};
-use axsync::Mutex;
 use bitmaps::Bitmap;
 use khal::time::wall_time;
 use kpoll::{IoEvents, Pollable};
+use ksync::Mutex;
 use linux_raw_sys::{
     general::{__kernel_old_time_t, __kernel_suseconds_t},
     ioctl::{EVIOCGID, EVIOCGRAB, EVIOCGVERSION},

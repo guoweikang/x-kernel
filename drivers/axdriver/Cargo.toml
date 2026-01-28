@@ -23,7 +23,7 @@ display = ["dep:display"]
 input = ["dep:input"]
 vsock = ["dep:vsock"]
 
-crosvm = ["pci-mmio", "dep:hashbrown", "dep:axsync", "dep:spin"]
+crosvm = ["pci-mmio", "dep:hashbrown", "dep:ksync", "dep:spin"]
 
 # Enabled by features `virtio-*`
 virtio = ["dep:virtio", "dep:kalloc", "dep:khal", "dep:platconfig"]
@@ -41,8 +41,6 @@ ahci = ["block", "block/ahci", "dep:khal", "dep:platconfig"]
 # ixgbe = ["net", "net/ixgbe", "dep:axalloc", "dep:khal", "dep:axdma"]
 # fxmac = ["net", "net/fxmac", "dep:axalloc", "dep:khal", "dep:axdma"]
 # more devices example: e1000 = ["net", "net/e1000"]
-
-irq = []
 
 default = ["bus-pci"]
 
@@ -72,7 +70,7 @@ rdrive = { version = "0.18", optional = true }
 smallvec = { version = "1.15", features = ["const_generics", "union"] }
 spin = { version = "0.10", optional = true }
 
-axsync = { workspace = true, optional = true }
+ksync = { workspace = true, optional = true }
 hashbrown = { workspace = true, optional = true }
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 arm-gic-driver = { version = "0.15", optional = true }

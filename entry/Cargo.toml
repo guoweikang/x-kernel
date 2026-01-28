@@ -80,7 +80,7 @@ axfs.workspace = true
 khal.workspace = true
 klogger.workspace = true
 axruntime.workspace = true
-axsync.workspace = true
+ksync.workspace = true
 axtask.workspace = true
 cfg-if.workspace = true
 linkme.workspace = true
@@ -94,12 +94,12 @@ starry-api.workspace = true
 [dependencies.aarch64-crosvm-virt]
 workspace = true
 optional = true
-features = ["irq", "fp-simd", "smp", "rtc"]
+features = ["fp-simd", "smp", "rtc"]
 
 [dependencies.x86-csv]
 workspace = true
 optional = true
-features = ["irq", "fp-simd", "smp", "rtc"]
+features = ["fp-simd", "smp", "rtc"]
 
 [package.metadata.vendor-filter]
 platforms = ["riscv64gc-unknown-none-elf", "loongarch64-unknown-none-softfloat"]
