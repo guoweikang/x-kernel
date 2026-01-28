@@ -1,9 +1,9 @@
 use axerrno::{AxError, AxResult};
-use axtask::{
-    AxCpuMask, current,
+use khal::time::TimeValue;
+use ktask::{
+    KCpuMask, current,
     future::{block_on, interruptible, sleep},
 };
-use khal::time::TimeValue;
 use linux_raw_sys::general::{
     __kernel_clockid_t, CLOCK_MONOTONIC, CLOCK_REALTIME, PRIO_PGRP, PRIO_PROCESS, PRIO_USER,
     SCHED_RR, TIMER_ABSTIME, timespec,
@@ -14,7 +14,7 @@ use starry_vm::{VmMutPtr, VmPtr, vm_load, vm_write_slice};
 use crate::time::TimeValueLike;
 
 pub fn sys_sched_yield() -> AxResult<isize> {
-    axtask::yield_now();
+    ktask::yield_now();
     Ok(0)
 }
 
@@ -111,7 +111,7 @@ pub fn sys_sched_setaffinity(
 ) -> AxResult<isize> {
     let size = cpusetsize.min(platconfig::plat::CPU_NUM.div_ceil(8));
     let user_mask = vm_load(user_mask, size)?;
-    let mut cpu_mask = AxCpuMask::new();
+    let mut cpu_mask = KCpuMask::new();
 
     for i in 0..(size * 8).min(platconfig::plat::CPU_NUM) {
         if user_mask[i / 8] & (1 << (i % 8)) != 0 {
@@ -120,7 +120,7 @@ pub fn sys_sched_setaffinity(
     }
 
     // TODO: support other threads
-    axtask::set_current_affinity(cpu_mask);
+    ktask::set_current_affinity(cpu_mask);
 
     Ok(0)
 }

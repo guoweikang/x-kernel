@@ -1,7 +1,7 @@
 use alloc::{borrow::ToOwned, fmt, string::String};
 
 use axerrno::AxResult;
-use axtask::{TaskInner, TaskState};
+use ktask::{TaskInner, TaskState};
 use starry_signal::Signo;
 
 use crate::task::AsThread;
@@ -67,7 +67,7 @@ pub struct TaskStat {
 }
 
 impl TaskStat {
-    /// Create a new [`TaskStat`] from a [`AxTaskRef`].
+    /// Create a new [`TaskStat`] from a [`KtaskRef`].
     pub fn from_thread(task: &TaskInner) -> AxResult<Self> {
         let thread = task.as_thread();
         let proc_data = &thread.proc_data;

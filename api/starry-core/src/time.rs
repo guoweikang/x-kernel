@@ -3,12 +3,12 @@
 use alloc::{borrow::ToOwned, collections::binary_heap::BinaryHeap, sync::Arc};
 use core::{mem, time::Duration};
 
-use axtask::{
-    WeakAxTaskRef, current,
-    future::{block_on, timeout_at},
-};
 use event_listener::{Event, listener};
 use khal::time::{NANOS_PER_SEC, TimeValue, monotonic_time_nanos, wall_time};
+use ktask::{
+    WeakKtaskRef, current,
+    future::{block_on, timeout_at},
+};
 use lazy_static::lazy_static;
 use spin::Mutex;
 use starry_signal::Signo;
@@ -24,7 +24,7 @@ fn time_value_from_nanos(nanos: usize) -> TimeValue {
 
 struct Entry {
     deadline: Duration,
-    task: WeakAxTaskRef,
+    task: WeakKtaskRef,
 }
 impl PartialEq for Entry {
     fn eq(&self, other: &Self) -> bool {
@@ -268,7 +268,7 @@ async fn alarm_task() {
 
 /// Spawns the alarm task.
 pub fn spawn_alarm_task() {
-    axtask::spawn_raw(
+    ktask::spawn_raw(
         || block_on(alarm_task()),
         "alarm_task".to_owned(),
         platconfig::TASK_STACK_SIZE,

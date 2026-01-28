@@ -14,7 +14,7 @@ use kspin::{BaseGuard, SpinNoIrqGuard, SpinRaw};
 use lazyinit::LazyInit;
 
 use crate::{
-    AxCpuMask, AxTaskRef, Scheduler, TaskInner,
+    KCpuMask, KtaskRef, Scheduler, TaskInner,
     future::block_on,
     task::{CurrentTask, TaskState},
 };
@@ -33,13 +33,13 @@ macro_rules! percpu_static {
 }
 
 percpu_static! {
-    RUN_QUEUE: LazyInit<AxRunQueue> = LazyInit::new(),
-    EXITED_TASKS: VecDeque<AxTaskRef> = VecDeque::new(),
+    RUN_QUEUE: LazyInit<RunQueue> = LazyInit::new(),
+    EXITED_TASKS: VecDeque<KtaskRef> = VecDeque::new(),
     WAIT_FOR_EXIT: AtomicWaker = AtomicWaker::new(),
-    IDLE_TASK: LazyInit<AxTaskRef> = LazyInit::new(),
+    IDLE_TASK: LazyInit<KtaskRef> = LazyInit::new(),
     /// Stores the weak reference to the previous task that is running on this CPU.
     #[cfg(feature = "smp")]
-    PREV_TASK: Weak<crate::AxTask> = Weak::new(),
+    PREV_TASK: Weak<crate::KTask> = Weak::new(),
 }
 
 /// An array of references to run queues, one for each CPU, indexed by cpu_id.
@@ -51,10 +51,10 @@ percpu_static! {
 /// Access to this variable is marked as `unsafe` because it contains `MaybeUninit` references,
 /// which require careful handling to avoid undefined behavior. The array should be fully
 /// initialized before being accessed to ensure safe usage.
-static mut RUN_QUEUES: [MaybeUninit<&'static mut AxRunQueue>; platconfig::plat::CPU_NUM] =
+static mut RUN_QUEUES: [MaybeUninit<&'static mut RunQueue>; platconfig::plat::CPU_NUM] =
     [ARRAY_REPEAT_VALUE; platconfig::plat::CPU_NUM];
 #[allow(clippy::declare_interior_mutable_const)] // It's ok because it's used only for initialization `RUN_QUEUES`.
-const ARRAY_REPEAT_VALUE: MaybeUninit<&'static mut AxRunQueue> = MaybeUninit::uninit();
+const ARRAY_REPEAT_VALUE: MaybeUninit<&'static mut RunQueue> = MaybeUninit::uninit();
 
 /// Returns a reference to the current run queue in [`CurrentRunQueueRef`].
 ///
@@ -67,7 +67,7 @@ const ARRAY_REPEAT_VALUE: MaybeUninit<&'static mut AxRunQueue> = MaybeUninit::un
 ///
 /// ## Returns
 ///
-/// * [`CurrentRunQueueRef`] - a static reference to the current [`AxRunQueue`].
+/// * [`CurrentRunQueueRef`] - a static reference to the current [`RunQueue`].
 #[inline(always)]
 pub(crate) fn current_run_queue<G: BaseGuard>() -> CurrentRunQueueRef<'static, G> {
     let irq_state = G::acquire();
@@ -99,7 +99,7 @@ pub(crate) fn current_run_queue<G: BaseGuard>() -> CurrentRunQueueRef<'static, G
 // The modulo operation is safe here because `platconfig::plat::CPU_NUM` is always greater than 1 with "smp" enabled.
 #[allow(clippy::modulo_one)]
 #[inline]
-fn select_run_queue_index(cpumask: AxCpuMask) -> usize {
+fn select_run_queue_index(cpumask: KCpuMask) -> usize {
     use core::sync::atomic::{AtomicUsize, Ordering};
     static RUN_QUEUE_INDEX: AtomicUsize = AtomicUsize::new(0);
 
@@ -125,14 +125,14 @@ fn select_run_queue_index(cpumask: AxCpuMask) -> usize {
 ///
 /// ## Returns
 ///
-/// A reference to the `AxRunQueue` corresponding to the provided index.
+/// A reference to the `RunQueue` corresponding to the provided index.
 ///
 /// ## Panics
 ///
 /// This function will panic if the index is out of bounds.
 #[cfg(feature = "smp")]
 #[inline]
-fn get_run_queue(index: usize) -> &'static mut AxRunQueue {
+fn get_run_queue(index: usize) -> &'static mut RunQueue {
     unsafe { RUN_QUEUES[index].assume_init_mut() }
 }
 
@@ -147,20 +147,20 @@ fn get_run_queue(index: usize) -> &'static mut AxRunQueue {
 ///
 /// ## Returns
 ///
-/// * [`AxRunQueueRef`] - a static reference to the selected [`AxRunQueue`] (current or remote).
+/// * [`KRunQueueRef`] - a static reference to the selected [`RunQueue`] (current or remote).
 ///
 /// ## TODO
 ///
 /// 1. Implement better load balancing across CPUs for more efficient task distribution.
 /// 2. Use a more generic load balancing algorithm that can be customized or replaced.
 #[inline]
-pub(crate) fn select_run_queue<G: BaseGuard>(task: &AxTaskRef) -> AxRunQueueRef<'static, G> {
+pub(crate) fn select_run_queue<G: BaseGuard>(task: &KtaskRef) -> KRunQueueRef<'static, G> {
     let irq_state = G::acquire();
     #[cfg(not(feature = "smp"))]
     {
         let _ = task;
         // When SMP is disabled, all tasks are scheduled on the same global run queue.
-        AxRunQueueRef {
+        KRunQueueRef {
             inner: unsafe { RUN_QUEUE.current_ref_mut_raw() },
             state: irq_state,
             _phantom: core::marker::PhantomData,
@@ -170,7 +170,7 @@ pub(crate) fn select_run_queue<G: BaseGuard>(task: &AxTaskRef) -> AxRunQueueRef<
     {
         // When SMP is enabled, select the run queue based on the task's CPU affinity and load balance.
         let index = select_run_queue_index(task.cpumask());
-        AxRunQueueRef {
+        KRunQueueRef {
             inner: get_run_queue(index),
             state: irq_state,
             _phantom: core::marker::PhantomData,
@@ -178,12 +178,12 @@ pub(crate) fn select_run_queue<G: BaseGuard>(task: &AxTaskRef) -> AxRunQueueRef<
     }
 }
 
-/// [`AxRunQueue`] represents a run queue for global system or a specific CPU.
-pub(crate) struct AxRunQueue {
+/// [`RunQueue`] represents a run queue for global system or a specific CPU.
+pub(crate) struct RunQueue {
     /// The ID of the CPU this run queue is associated with.
     cpu_id: usize,
     /// The core scheduler of this run queue.
-    /// Since irq and preempt are preserved by the kernel guard hold by `AxRunQueueRef`,
+    /// Since irq and preempt are preserved by the kernel guard hold by `KRunQueueRef`,
     /// we just use a simple raw spin lock here.
     scheduler: SpinRaw<Scheduler>,
 }
@@ -191,17 +191,17 @@ pub(crate) struct AxRunQueue {
 /// A reference to the run queue with specific guard.
 ///
 /// Note:
-/// [`AxRunQueueRef`] is used to get a reference to the run queue on current CPU
+/// [`KRunQueueRef`] is used to get a reference to the run queue on current CPU
 /// or a remote CPU, which is used to add tasks to the run queue or unblock tasks.
 /// If you want to perform scheduling operations on the current run queue,
 /// see [`CurrentRunQueueRef`].
-pub(crate) struct AxRunQueueRef<'a, G: BaseGuard> {
-    inner: &'a mut AxRunQueue,
+pub(crate) struct KRunQueueRef<'a, G: BaseGuard> {
+    inner: &'a mut RunQueue,
     state: G::State,
     _phantom: core::marker::PhantomData<G>,
 }
 
-impl<G: BaseGuard> Drop for AxRunQueueRef<'_, G> {
+impl<G: BaseGuard> Drop for KRunQueueRef<'_, G> {
     fn drop(&mut self) {
         G::release(self.state);
     }
@@ -213,7 +213,7 @@ impl<G: BaseGuard> Drop for AxRunQueueRef<'_, G> {
 /// [`CurrentRunQueueRef`] is used to get a reference to the run queue on current CPU,
 /// in which scheduling operations can be performed.
 pub(crate) struct CurrentRunQueueRef<'a, G: BaseGuard> {
-    inner: &'a mut AxRunQueue,
+    inner: &'a mut RunQueue,
     current_task: CurrentTask,
     state: G::State,
     _phantom: core::marker::PhantomData<G>,
@@ -226,11 +226,11 @@ impl<G: BaseGuard> Drop for CurrentRunQueueRef<'_, G> {
 }
 
 /// Management operations for run queue, including adding tasks, unblocking tasks, etc.
-impl<G: BaseGuard> AxRunQueueRef<'_, G> {
+impl<G: BaseGuard> KRunQueueRef<'_, G> {
     /// Adds a task to the scheduler.
     ///
     /// This function is used to add a new task to the scheduler.
-    pub fn add_task(&mut self, task: AxTaskRef) {
+    pub fn add_task(&mut self, task: KtaskRef) {
         debug!(
             "task add: {} on run_queue {}",
             task.id_name(),
@@ -249,7 +249,7 @@ impl<G: BaseGuard> AxRunQueueRef<'_, G> {
     ///
     /// This function does nothing if the task is not in [`TaskState::Blocked`],
     /// which means the task is already unblocked by other cores.
-    pub fn unblock_task(&mut self, task: AxTaskRef, resched: bool) {
+    pub fn unblock_task(&mut self, task: KtaskRef, resched: bool) {
         let task_id_name = task.id_name();
         // Try to change the state of the task from `Blocked` to `Ready`,
         // if successful, the task will be put into this run queue,
@@ -305,7 +305,7 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
     /// Note: the ownership if migrating task (which is current task) is handed over to the migration task,
     /// before the migration task inserted it into the target run queue.
     #[cfg(feature = "smp")]
-    pub fn migrate_current(&mut self, migration_task: AxTaskRef) {
+    pub fn migrate_current(&mut self, migration_task: KtaskRef) {
         let curr = &self.current_task;
         trace!("task migrate: {}", curr.id_name());
         assert!(curr.is_running());
@@ -426,7 +426,7 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
     }
 }
 
-impl AxRunQueue {
+impl RunQueue {
     /// Create a new run queue for the specified CPU.
     /// The run queue is initialized with a per-CPU gc task in its scheduler.
     fn new(cpu_id: usize) -> Self {
@@ -437,7 +437,7 @@ impl AxRunQueue {
         )
         .into_arc();
         // gc task should be pinned to the current CPU.
-        gc_task.set_cpumask(AxCpuMask::one_shot(cpu_id));
+        gc_task.set_cpumask(KCpuMask::one_shot(cpu_id));
 
         let mut scheduler = Scheduler::new();
         scheduler.add_task(gc_task);
@@ -456,7 +456,7 @@ impl AxRunQueue {
     /// otherwise `false`.
     fn put_task_with_state(
         &mut self,
-        task: AxTaskRef,
+        task: KtaskRef,
         current_state: TaskState,
         preempt: bool,
     ) -> bool {
@@ -512,7 +512,7 @@ impl AxRunQueue {
         self.switch_to(crate::current(), next);
     }
 
-    fn switch_to(&mut self, prev_task: CurrentTask, next_task: AxTaskRef) {
+    fn switch_to(&mut self, prev_task: CurrentTask, next_task: KtaskRef) {
         // Make sure that IRQs are disabled by kernel guard or other means.
         assert!(
             !khal::asm::is_enabled(),
@@ -626,7 +626,7 @@ fn poll_gc(cx: &mut Context<'_>) -> Poll<()> {
 /// It calls `select_run_queue` to get the correct run queue for the task, and
 /// then puts the task to the scheduler of target run queue.
 #[cfg(feature = "smp")]
-pub(crate) fn migrate_entry(migrated_task: AxTaskRef) {
+pub(crate) fn migrate_entry(migrated_task: KtaskRef) {
     select_run_queue::<kspin::NoPreemptIrqSave>(&migrated_task)
         .inner
         .scheduler
@@ -655,7 +655,7 @@ pub(crate) fn init() {
     const IDLE_TASK_STACK_SIZE: usize = 16384;
     let idle_task = TaskInner::new(|| crate::run_idle(), "idle".into(), IDLE_TASK_STACK_SIZE);
     // idle task should be pinned to the current CPU.
-    idle_task.set_cpumask(AxCpuMask::one_shot(cpu_id));
+    idle_task.set_cpumask(KCpuMask::one_shot(cpu_id));
     IDLE_TASK.with_current(|i| {
         i.init_once(idle_task.into_arc());
     });
@@ -666,7 +666,7 @@ pub(crate) fn init() {
     unsafe { CurrentTask::init_current(main_task) }
 
     RUN_QUEUE.with_current(|rq| {
-        rq.init_once(AxRunQueue::new(cpu_id));
+        rq.init_once(RunQueue::new(cpu_id));
     });
     unsafe {
         RUN_QUEUES[cpu_id].write(RUN_QUEUE.current_ref_mut_raw());
@@ -685,7 +685,7 @@ pub(crate) fn init_secondary() {
     unsafe { CurrentTask::init_current(idle_task) }
 
     RUN_QUEUE.with_current(|rq| {
-        rq.init_once(AxRunQueue::new(cpu_id));
+        rq.init_once(RunQueue::new(cpu_id));
     });
     unsafe {
         RUN_QUEUES[cpu_id].write(RUN_QUEUE.current_ref_mut_raw());

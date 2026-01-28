@@ -10,8 +10,8 @@ use alloc::{
 use core::{ffi::CStr, iter};
 
 use axfs_ng_vfs::{Filesystem, NodeType, VfsError, VfsResult};
-use axtask::{AxTaskRef, WeakAxTaskRef, current};
 use indoc::indoc;
+use ktask::{KtaskRef, WeakKtaskRef, current};
 use starry_core::{
     task::{AsThread, TaskStat, get_task, tasks},
     vfs::{
@@ -128,7 +128,7 @@ impl SimpleDirOps for ProcessTaskDir {
 }
 
 #[rustfmt::skip]
-fn task_status(task: &AxTaskRef) -> String {
+fn task_status(task: &KtaskRef) -> String {
     format!(
         "Tgid:\t{}\n\
         Pid:\t{}\n\
@@ -146,7 +146,7 @@ fn task_status(task: &AxTaskRef) -> String {
 /// The /proc/[pid]/fd directory
 struct ThreadFdDir {
     fs: Arc<SimpleFs>,
-    task: WeakAxTaskRef,
+    task: WeakKtaskRef,
 }
 
 impl SimpleDirOps for ThreadFdDir {
@@ -186,7 +186,7 @@ impl SimpleDirOps for ThreadFdDir {
 /// The /proc/[pid] directory
 struct ThreadDir {
     fs: Arc<SimpleFs>,
-    task: WeakAxTaskRef,
+    task: WeakKtaskRef,
 }
 
 impl SimpleDirOps for ThreadDir {

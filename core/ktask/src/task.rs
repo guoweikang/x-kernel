@@ -20,7 +20,7 @@ use khal::tls::TlsArea;
 use kspin::SpinNoIrq;
 use memaddr::{VirtAddr, align_up_4k};
 
-use crate::{AxCpuMask, AxTask, AxTaskRef, future::block_on};
+use crate::{KCpuMask, KTask, KtaskRef, future::block_on};
 
 /// A unique identifier for a thread.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -47,7 +47,7 @@ pub enum TaskState {
 #[cfg(feature = "task-ext")]
 #[extern_trait::extern_trait(
     /// The impl proxy type for [`TaskExt`].
-    pub AxTaskExt
+    pub KTaskExt
 )]
 pub unsafe trait TaskExt {
     /// Called when the task is switched in.
@@ -93,7 +93,7 @@ pub struct TaskInner {
     state: AtomicU8,
 
     /// CPU affinity mask.
-    cpumask: SpinNoIrq<AxCpuMask>,
+    cpumask: SpinNoIrq<KCpuMask>,
 
     /// Used to indicate the CPU ID where the task is running or will run.
     cpu_id: AtomicU32,
@@ -116,7 +116,7 @@ pub struct TaskInner {
     ctx: UnsafeCell<TaskContext>,
 
     #[cfg(feature = "task-ext")]
-    task_ext: Option<AxTaskExt>,
+    task_ext: Option<KTaskExt>,
 
     #[cfg(feature = "tls")]
     tls: TlsArea,
@@ -214,13 +214,13 @@ impl TaskInner {
 
     /// Returns a reference to the task extended data.
     #[cfg(feature = "task-ext")]
-    pub fn task_ext(&self) -> Option<&AxTaskExt> {
+    pub fn task_ext(&self) -> Option<&KTaskExt> {
         self.task_ext.as_ref()
     }
 
     /// Returns a mutable reference to the task extended data.
     #[cfg(feature = "task-ext")]
-    pub fn task_ext_mut(&mut self) -> &mut Option<AxTaskExt> {
+    pub fn task_ext_mut(&mut self) -> &mut Option<KTaskExt> {
         &mut self.task_ext
     }
 
@@ -255,18 +255,18 @@ impl TaskInner {
 
     /// Gets the cpu affinity mask of the task.
     ///
-    /// Returns the cpu affinity mask of the task in type [`AxCpuMask`].
+    /// Returns the cpu affinity mask of the task in type [`KCpuMask`].
     #[inline]
-    pub fn cpumask(&self) -> AxCpuMask {
+    pub fn cpumask(&self) -> KCpuMask {
         *self.cpumask.lock()
     }
 
     /// Sets the cpu affinity mask of the task.
     ///
     /// # Arguments
-    /// `cpumask` - The cpu affinity mask to be set in type [`AxCpuMask`].
+    /// `cpumask` - The cpu affinity mask to be set in type [`KCpuMask`].
     #[inline]
-    pub fn set_cpumask(&self, cpumask: AxCpuMask) {
+    pub fn set_cpumask(&self, cpumask: KCpuMask) {
         *self.cpumask.lock() = cpumask
     }
 
@@ -385,7 +385,7 @@ impl TaskInner {
 // private methods
 impl TaskInner {
     fn new_common(id: TaskId, name: String) -> Self {
-        let mut cpumask = AxCpuMask::new();
+        let mut cpumask = KCpuMask::new();
         for cpu_id in 0..crate::api::active_cpu_num() {
             cpumask.set(cpu_id, true);
         }
@@ -440,8 +440,8 @@ impl TaskInner {
         t
     }
 
-    pub(crate) fn into_arc(self) -> AxTaskRef {
-        Arc::new(AxTask::new(self))
+    pub(crate) fn into_arc(self) -> KtaskRef {
+        Arc::new(KTask::new(self))
     }
 
     /// Returns the current state of the task.
@@ -620,16 +620,16 @@ impl Drop for TaskStack {
     }
 }
 
-/// A wrapper of [`AxTaskRef`] as the current task.
+/// A wrapper of [`KtaskRef`] as the current task.
 ///
 /// It won't change the reference count of the task when created or dropped.
-pub struct CurrentTask(ManuallyDrop<AxTaskRef>);
+pub struct CurrentTask(ManuallyDrop<KtaskRef>);
 
 impl CurrentTask {
     pub(crate) fn try_get() -> Option<Self> {
-        let ptr: *const super::AxTask = khal::percpu::current_task_ptr();
+        let ptr: *const super::KTask = khal::percpu::current_task_ptr();
         if !ptr.is_null() {
-            Some(Self(unsafe { ManuallyDrop::new(AxTaskRef::from_raw(ptr)) }))
+            Some(Self(unsafe { ManuallyDrop::new(KtaskRef::from_raw(ptr)) }))
         } else {
             None
         }
@@ -639,18 +639,18 @@ impl CurrentTask {
         Self::try_get().expect("current task is uninitialized")
     }
 
-    /// Clone the inner `AxTaskRef`.
+    /// Clone the inner `KtaskRef`.
     #[allow(clippy::should_implement_trait)]
-    pub fn clone(&self) -> AxTaskRef {
+    pub fn clone(&self) -> KtaskRef {
         self.0.deref().clone()
     }
 
     /// Returns `true` if the current task is the same as `other`.
-    pub fn ptr_eq(&self, other: &AxTaskRef) -> bool {
+    pub fn ptr_eq(&self, other: &KtaskRef) -> bool {
         Arc::ptr_eq(&self.0, other)
     }
 
-    pub(crate) unsafe fn init_current(init_task: AxTaskRef) {
+    pub(crate) unsafe fn init_current(init_task: KtaskRef) {
         assert!(init_task.is_init());
         #[cfg(feature = "tls")]
         unsafe {
@@ -662,7 +662,7 @@ impl CurrentTask {
         }
     }
 
-    pub(crate) unsafe fn set_current(prev: Self, next: AxTaskRef) {
+    pub(crate) unsafe fn set_current(prev: Self, next: KtaskRef) {
         let Self(arc) = prev;
         ManuallyDrop::into_inner(arc); // `call Arc::drop()` to decrease prev task reference count.
         let ptr = Arc::into_raw(next);
@@ -673,7 +673,7 @@ impl CurrentTask {
 }
 
 impl Deref for CurrentTask {
-    type Target = AxTaskRef;
+    type Target = KtaskRef;
 
     fn deref(&self) -> &Self::Target {
         &self.0

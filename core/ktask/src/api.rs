@@ -13,7 +13,7 @@ use kspin::NoPreemptIrqSave;
 pub(crate) use crate::run_queue::{current_run_queue, select_run_queue};
 #[doc(cfg(feature = "task-ext"))]
 #[cfg(feature = "task-ext")]
-pub use crate::task::{AxTaskExt, TaskExt};
+pub use crate::task::{KTaskExt, TaskExt};
 pub use crate::{
     task::{CurrentTask, TaskId, TaskInner, TaskState},
     timers::register_timer_callback,
@@ -21,27 +21,27 @@ pub use crate::{
 };
 
 /// The reference type of a task.
-pub type AxTaskRef = Arc<AxTask>;
+pub type KtaskRef = Arc<KTask>;
 
 /// The weak reference type of a task.
-pub type WeakAxTaskRef = Weak<AxTask>;
+pub type WeakKtaskRef = Weak<KTask>;
 
 /// The wrapper type for [`cpumask::CpuMask`] with SMP configuration.
-pub type AxCpuMask = cpumask::CpuMask<{ platconfig::plat::CPU_NUM }>;
+pub type KCpuMask = cpumask::CpuMask<{ platconfig::plat::CPU_NUM }>;
 
 static CPU_NUM: AtomicUsize = AtomicUsize::new(1);
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "sched-rr")] {
         const MAX_TIME_SLICE: usize = 5;
-        pub(crate) type AxTask = axsched::RRTask<TaskInner, MAX_TIME_SLICE>;
+        pub(crate) type KTask = axsched::RRTask<TaskInner, MAX_TIME_SLICE>;
         pub(crate) type Scheduler = axsched::RRScheduler<TaskInner, MAX_TIME_SLICE>;
     } else if #[cfg(feature = "sched-cfs")] {
-        pub(crate) type AxTask = axsched::CFSTask<TaskInner>;
+        pub(crate) type KTask = axsched::CFSTask<TaskInner>;
         pub(crate) type Scheduler = axsched::CFScheduler<TaskInner>;
     } else {
         // If no scheduler features are set, use FIFO as the default.
-        pub(crate) type AxTask = axsched::FifoTask<TaskInner>;
+        pub(crate) type KTask = axsched::FifoTask<TaskInner>;
         pub(crate) type Scheduler = axsched::FifoScheduler<TaskInner>;
     }
 }
@@ -124,7 +124,7 @@ pub fn on_timer_tick() {
 }
 
 /// Adds the given task to the run queue, returns the task reference.
-pub fn spawn_task(task: TaskInner) -> AxTaskRef {
+pub fn spawn_task(task: TaskInner) -> KtaskRef {
     let task_ref = task.into_arc();
     select_run_queue::<NoPreemptIrqSave>(&task_ref).add_task(task_ref.clone());
     task_ref
@@ -133,7 +133,7 @@ pub fn spawn_task(task: TaskInner) -> AxTaskRef {
 /// Spawns a new task with the given parameters.
 ///
 /// Returns the task reference.
-pub fn spawn_raw<F>(f: F, name: String, stack_size: usize) -> AxTaskRef
+pub fn spawn_raw<F>(f: F, name: String, stack_size: usize) -> KtaskRef
 where
     F: FnOnce() + Send + 'static,
 {
@@ -143,7 +143,7 @@ where
 /// Spawns a new task with the given name and the default stack size ([`platconfig::TASK_STACK_SIZE`]).
 ///
 /// Returns the task reference.
-pub fn spawn_with_name<F>(f: F, name: String) -> AxTaskRef
+pub fn spawn_with_name<F>(f: F, name: String) -> KtaskRef
 where
     F: FnOnce() + Send + 'static,
 {
@@ -156,7 +156,7 @@ where
 /// [`platconfig::TASK_STACK_SIZE`].
 ///
 /// Returns the task reference.
-pub fn spawn<F>(f: F) -> AxTaskRef
+pub fn spawn<F>(f: F) -> KtaskRef
 where
     F: FnOnce() + Send + 'static,
 {
@@ -177,11 +177,11 @@ pub fn set_prio(prio: isize) -> bool {
 }
 
 /// Set the affinity for the current task.
-/// [`AxCpuMask`] is used to specify the CPU affinity.
+/// [`KCpuMask`] is used to specify the CPU affinity.
 /// Returns `true` if the affinity is set successfully.
 ///
 /// TODO: support set the affinity for other tasks.
-pub fn set_current_affinity(cpumask: AxCpuMask) -> bool {
+pub fn set_current_affinity(cpumask: KCpuMask) -> bool {
     if cpumask.is_empty() {
         false
     } else {

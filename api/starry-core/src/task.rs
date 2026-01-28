@@ -18,11 +18,11 @@ use core::{
 
 use axerrno::{AxError, AxResult};
 use axmm::AddrSpace;
-use axtask::{AxTaskRef, TaskExt, TaskInner, WeakAxTaskRef, current};
 use extern_trait::extern_trait;
 use hashbrown::HashMap;
 use kpoll::PollSet;
 use ksync::{Mutex, spin::SpinNoIrq};
+use ktask::{KtaskRef, TaskExt, TaskInner, WeakKtaskRef, current};
 use lazy_static::lazy_static;
 use scope_local::{ActiveScope, Scope};
 use spin::RwLock;
@@ -361,7 +361,7 @@ lazy_static! {
     static ref SHARED_FUTEX_TABLES: Mutex<FutexTables> = Mutex::new(FutexTables::new());
 }
 
-static TASK_TABLE: RwLock<WeakMap<Pid, WeakAxTaskRef>> = RwLock::new(WeakMap::new());
+static TASK_TABLE: RwLock<WeakMap<Pid, WeakKtaskRef>> = RwLock::new(WeakMap::new());
 
 static PROCESS_TABLE: RwLock<WeakMap<Pid, Weak<ProcessData>>> = RwLock::new(WeakMap::new());
 
@@ -382,7 +382,7 @@ pub fn cleanup_task_tables() {
 
 /// Add the task, the thread and possibly its process, process group and session
 /// to the corresponding tables.
-pub fn add_task_to_table(task: &AxTaskRef) {
+pub fn add_task_to_table(task: &KtaskRef) {
     let tid = task.id().as_u64() as Pid;
 
     let mut task_table = TASK_TABLE.write();
@@ -413,12 +413,12 @@ pub fn add_task_to_table(task: &AxTaskRef) {
 }
 
 /// Lists all tasks.
-pub fn tasks() -> Vec<AxTaskRef> {
+pub fn tasks() -> Vec<KtaskRef> {
     TASK_TABLE.read().values().collect()
 }
 
 /// Finds the task with the given TID.
-pub fn get_task(tid: Pid) -> AxResult<AxTaskRef> {
+pub fn get_task(tid: Pid) -> AxResult<KtaskRef> {
     if tid == 0 {
         return Ok(current().clone());
     }

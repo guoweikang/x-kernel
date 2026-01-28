@@ -11,7 +11,7 @@ use core::{
 use axerrno::AxError;
 use kspin::{NoPreemptIrqSave, SpinNoIrq};
 
-use crate::{AxTaskRef, WeakAxTaskRef, current, current_run_queue, select_run_queue};
+use crate::{KtaskRef, WeakKtaskRef, current, current_run_queue, select_run_queue};
 
 mod poll;
 pub use poll::*;
@@ -19,21 +19,21 @@ pub use poll::*;
 mod time;
 pub use time::*;
 
-struct AxWaker {
-    task: WeakAxTaskRef,
+struct KWaker {
+    task: WeakKtaskRef,
     woke: SpinNoIrq<bool>,
 }
 
-impl AxWaker {
-    fn new(task: &AxTaskRef) -> Arc<Self> {
-        Arc::new(AxWaker {
+impl KWaker {
+    fn new(task: &KtaskRef) -> Arc<Self> {
+        Arc::new(KWaker {
             task: Arc::downgrade(task),
             woke: SpinNoIrq::new(false),
         })
     }
 }
 
-impl Wake for AxWaker {
+impl Wake for KWaker {
     fn wake(self: Arc<Self>) {
         self.wake_by_ref();
     }
@@ -58,7 +58,7 @@ pub fn block_on<F: IntoFuture>(f: F) -> F::Output {
     // to prevent it from being dropped while blocking.
     let task = curr.clone();
 
-    let axwaker = AxWaker::new(&task);
+    let axwaker = KWaker::new(&task);
     let waker = Waker::from(axwaker.clone());
     let mut cx = Context::from_waker(&waker);
 
