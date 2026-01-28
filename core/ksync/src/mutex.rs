@@ -74,6 +74,10 @@ impl RawMutex {
     }
 
     /// Resets all statistics counters (only available with `stats` feature).
+    ///
+    /// Note: This method is not synchronized. If called while the mutex is being
+    /// actively used, the reset may produce inconsistent results as the individual
+    /// counters are reset independently.
     #[cfg(feature = "stats")]
     pub fn reset_stats(&self) {
         self.stats.total_locks.store(0, Ordering::Relaxed);

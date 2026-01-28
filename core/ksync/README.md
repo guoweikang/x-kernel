@@ -47,7 +47,7 @@ Reader-writer lock allows multiple concurrent readers but only one writer:
 ```rust
 use ksync::RwLock;
 
-static CONFIG: RwLock<Config> = RwLock::new(Config::default());
+static CONFIG: RwLock<u32> = RwLock::new(0);
 
 fn reader() {
     let config = CONFIG.read();

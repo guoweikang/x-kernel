@@ -81,6 +81,8 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
             return false;
         }
         
+        // Using strong compare_exchange here since this is a single-shot attempt
+        // without retry loop, unlike lock_shared which uses _weak in a loop
         self.state
             .compare_exchange(
                 state,

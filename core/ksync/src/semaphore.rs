@@ -24,7 +24,8 @@ impl Semaphore {
     /// Acquires a permit, blocking until one is available.
     pub fn acquire(&self) {
         loop {
-            let count = self.count.load(Ordering::Relaxed);
+            // Use Acquire ordering for consistency
+            let count = self.count.load(Ordering::Acquire);
             
             if count == 0 {
                 listener!(self.event => listener);
@@ -49,8 +50,13 @@ impl Semaphore {
     /// Tries to acquire a permit without blocking.
     ///
     /// Returns `true` if a permit was acquired, `false` otherwise.
+    /// 
+    /// Note: Uses a bounded retry loop to handle transient CAS failures.
     pub fn try_acquire(&self) -> bool {
-        loop {
+        // Limit retries to avoid spinning too long on contention
+        const MAX_RETRIES: usize = 10;
+        
+        for _ in 0..MAX_RETRIES {
             let count = self.count.load(Ordering::Relaxed);
             
             if count == 0 {
@@ -67,9 +73,15 @@ impl Semaphore {
                 Err(_) => continue,
             }
         }
+        
+        // Final attempt after retries
+        false
     }
     
     /// Releases a permit.
+    ///
+    /// Note: This method allows releasing more permits than the semaphore was
+    /// initialized with. Callers are responsible for ensuring balanced acquire/release.
     pub fn release(&self) {
         self.count.fetch_add(1, Ordering::Release);
         self.event.notify(1);
