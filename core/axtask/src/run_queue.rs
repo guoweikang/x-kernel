@@ -7,9 +7,9 @@ use core::{
     task::{Context, Poll},
 };
 
-use axhal::percpu::this_cpu_id;
 use axsched::BaseScheduler;
 use futures_util::task::AtomicWaker;
+use khal::percpu::this_cpu_id;
 use kspin::{BaseGuard, SpinNoIrqGuard, SpinRaw};
 use lazyinit::LazyInit;
 
@@ -368,7 +368,7 @@ impl<G: BaseGuard> CurrentRunQueueRef<'_, G> {
             unsafe {
                 EXITED_TASKS.current_ref_mut_raw().clear();
             }
-            axhal::power::shutdown();
+            khal::power::shutdown();
         } else {
             // Notify the joiner task.
             curr.notify_exit(exit_code);
@@ -517,7 +517,7 @@ impl AxRunQueue {
         // Make sure that IRQs are disabled by kernel guard or other means.
         #[cfg(all(not(test), feature = "irq"))] // Note: irq is faked under unit tests.
         assert!(
-            !axhal::asm::is_enabled(),
+            !khal::asm::is_enabled(),
             "IRQs must be disabled during scheduling"
         );
         trace!(

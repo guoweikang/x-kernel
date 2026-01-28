@@ -10,10 +10,10 @@ use core::{num::NonZeroUsize, ops::Range, task::Context};
 use axfs_ng_vfs::{
     FileNode, Location, NodeFlags, NodePermission, NodeType, VfsError, VfsResult, path::Path,
 };
-use axhal::mem::{PhysAddr, VirtAddr, v2p};
 use axsync::Mutex;
 use intrusive_collections::{LinkedList, LinkedListAtomicLink, intrusive_adapter};
 use kalloc::{UsageKind, global_allocator};
+use khal::mem::{PhysAddr, VirtAddr, v2p};
 use kio::{SeekFrom, prelude::*};
 use kpoll::{IoEvents, Pollable};
 use lru::LruCache;
@@ -946,10 +946,10 @@ impl Drop for File {
         if flags != 0 {
             let mut update = axfs_ng_vfs::MetadataUpdate::default();
             if flags & 1 != 0 {
-                update.atime = Some(axhal::time::wall_time());
+                update.atime = Some(khal::time::wall_time());
             }
             if flags & 2 != 0 {
-                update.mtime = Some(axhal::time::wall_time());
+                update.mtime = Some(khal::time::wall_time());
             }
             if let Err(err) = self.inner.location().update_metadata(update) {
                 warn!("Failed to update file times on drop: {err:?}");
