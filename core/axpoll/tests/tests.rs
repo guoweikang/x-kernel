@@ -73,8 +73,10 @@ fn overwrite() {
         let cx = Context::from_waker(&w);
         ps.register(cx.waker());
     }
-    assert_eq!(ps.wake(), 64);
+    // With Vec instead of fixed array, all 65 wakers are stored
+    assert_eq!(ps.wake(), 65);
     let total: usize = counters.iter().map(|c| c.count()).sum();
+    // All 65 are woken during wake(), none during registration
     assert_eq!(total, 65);
 }
 

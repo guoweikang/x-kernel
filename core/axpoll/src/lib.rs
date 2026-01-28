@@ -7,13 +7,15 @@
 extern crate alloc;
 
 use core::{
-    mem::MaybeUninit,
     task::{Context, Waker},
 };
 
 use bitflags::bitflags;
 use linux_raw_sys::general::*;
-use axsync::Mutex;
+use kspin::SpinNoIrq;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 bitflags! {
     /// I/O events.
@@ -63,65 +65,52 @@ pub trait Pollable {
     fn register(&self, context: &mut Context<'_>, events: IoEvents);
 }
 
-const POLL_SET_CAPACITY: usize = 64;
-
+#[cfg(feature = "alloc")]
 struct Inner {
-    entries: [MaybeUninit<Waker>; POLL_SET_CAPACITY],
-    cursor: usize,
+    wakers: Vec<Waker>,
 }
 
+#[cfg(feature = "alloc")]
 impl Inner {
     const fn new() -> Self {
         Self {
-            entries: unsafe { MaybeUninit::uninit().assume_init() },
-            cursor: 0,
+            wakers: Vec::new(),
         }
-    }
-
-    fn len(&self) -> usize {
-        self.cursor.min(POLL_SET_CAPACITY)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.cursor == 0
     }
 
     fn register(&mut self, waker: &Waker) {
-        let slot = self.cursor % POLL_SET_CAPACITY;
-        if self.cursor >= POLL_SET_CAPACITY {
-            let old = unsafe { self.entries[slot].assume_init_read() };
-            if !old.will_wake(waker) {
-                old.wake();
-            }
-            self.cursor = ((slot + 1) % POLL_SET_CAPACITY) + POLL_SET_CAPACITY;
-        } else {
-            self.cursor += 1;
-        }
-        self.entries[slot].write(waker.clone());
+        self.wakers.push(waker.clone());
     }
-}
 
-impl Drop for Inner {
-    fn drop(&mut self) {
-        for i in 0..self.len() {
-            unsafe { self.entries[i].assume_init_read() }.wake();
-        }
+    fn take_wakers(&mut self) -> Vec<Waker> {
+        core::mem::take(&mut self.wakers)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.wakers.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.wakers.len()
     }
 }
 
 /// A data structure for waking up tasks that are waiting for I/O events.
-pub struct PollSet(Mutex<Inner>);
+#[cfg(feature = "alloc")]
+pub struct PollSet(SpinNoIrq<Inner>);
 
+#[cfg(feature = "alloc")]
 impl Default for PollSet {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(feature = "alloc")]
 impl PollSet {
     /// Creates a new empty [`PollSet`].
     pub const fn new() -> Self {
-        Self(Mutex::new(Inner::new()))
+        Self(SpinNoIrq::new(Inner::new()))
     }
 
     /// Registers a waker.
@@ -130,20 +119,37 @@ impl PollSet {
     }
 
     /// Wakes up all registered wakers.
+    ///
+    /// Returns the number of wakers that were woken up.
     pub fn wake(&self) -> usize {
-        let mut guard = self.0.lock();
-        if guard.is_empty() {
-            return 0;
+        // Collect all wakers while holding the lock, then release the lock
+        // before calling wake() to avoid potential deadlock
+        let wakers = {
+            let mut guard = self.0.lock();
+            if guard.is_empty() {
+                return 0;
+            }
+            let count = guard.len();
+            let wakers = guard.take_wakers();
+            drop(guard);  // Explicitly release the lock
+            (count, wakers)
+        };
+
+        let (count, wakers) = wakers;
+        
+        // Call wake() outside the lock to avoid reentry issues
+        for waker in wakers {
+            waker.wake();
         }
-        let inner = core::mem::replace(&mut *guard, Inner::new());
-        drop(guard);
-        inner.len()
+        
+        count
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Drop for PollSet {
     fn drop(&mut self) {
-        // Ensure all entries are dropped
+        // Ensure all wakers are woken when dropped
         self.wake();
     }
 }
