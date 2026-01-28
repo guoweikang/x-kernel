@@ -89,10 +89,6 @@ impl Inner {
     fn is_empty(&self) -> bool {
         self.wakers.is_empty()
     }
-
-    fn len(&self) -> usize {
-        self.wakers.len()
-    }
 }
 
 /// A data structure for waking up tasks that are waiting for I/O events.
