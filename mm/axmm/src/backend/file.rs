@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use axerrno::{AxError, AxResult};
 use axfs::{CachedFile, FileFlags};
 use axhal::paging::{MappingFlags, PageSize, PageTableMut, PagingError};
-use axsync::Mutex;
+use ksync::Mutex;
 use memaddr::{PAGE_SIZE_4K, VirtAddr, VirtAddrRange};
 
 use crate::{

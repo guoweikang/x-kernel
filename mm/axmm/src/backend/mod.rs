@@ -7,8 +7,8 @@ use axhal::{
     mem::{p2v, v2p},
     paging::{MappingFlags, PageSize, PageTable, PageTableMut},
 };
-use axsync::Mutex;
 use enum_dispatch::enum_dispatch;
+use ksync::Mutex;
 use memaddr::{DynPageIter, PAGE_SIZE_4K, PhysAddr, VirtAddr, VirtAddrRange};
 use memory_set::MappingBackend;
 

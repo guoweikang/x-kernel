@@ -6,8 +6,8 @@ use axhal::{
     time::monotonic_time_nanos,
 };
 use axmm::backend::{Backend, SharedPages};
-use axsync::Mutex;
 use axtask::current;
+use ksync::Mutex;
 use linux_raw_sys::general::*;
 use memaddr::{PAGE_SIZE_4K, VirtAddr, VirtAddrRange};
 use starry_core::{

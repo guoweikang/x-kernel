@@ -7,7 +7,7 @@ use axhal::{
     paging::{MappingFlags, PageTable},
     trap::PageFaultFlags,
 };
-use axsync::Mutex;
+use ksync::Mutex;
 use memaddr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };

@@ -3,7 +3,7 @@ use core::ops::Deref;
 
 use axerrno::AxResult;
 use axhal::paging::{MappingFlags, PageSize, PageTableMut};
-use axsync::Mutex;
+use ksync::Mutex;
 use memaddr::{MemoryAddr, PhysAddr, VirtAddr, VirtAddrRange};
 
 use super::{alloc_frame, dealloc_frame};

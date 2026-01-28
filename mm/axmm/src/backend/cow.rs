@@ -7,8 +7,8 @@ use axhal::{
     mem::p2v,
     paging::{MappingFlags, PageSize, PageTableMut, PagingError},
 };
-use axsync::Mutex;
 use kspin::SpinNoIrq;
+use ksync::Mutex;
 use memaddr::{PhysAddr, VirtAddr, VirtAddrRange};
 
 use crate::{
