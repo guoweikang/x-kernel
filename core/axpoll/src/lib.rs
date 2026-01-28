@@ -129,19 +129,16 @@ impl PollSet {
             if guard.is_empty() {
                 return 0;
             }
-            let count = guard.len();
-            let wakers = guard.take_wakers();
-            drop(guard);  // Explicitly release the lock
-            (count, wakers)
+            guard.take_wakers()
         };
 
-        let (count, wakers) = wakers;
-        
+        let count = wakers.len();
+
         // Call wake() outside the lock to avoid reentry issues
         for waker in wakers {
             waker.wake();
         }
-        
+
         count
     }
 }
