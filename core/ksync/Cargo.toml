@@ -11,6 +11,7 @@ description = "x-kernel synchronization primitives"
 
 [features]
 default = []
+stats = []       # Enable statistics tracking for mutex operations
 watchdog = ["dep:axhal"]
 
 [dependencies]
