@@ -1,13 +1,11 @@
 [package]
-name = "axipi"
+name = "kipi"
 version.workspace = true
 edition.workspace = true
-authors = ["Keyang Hu <keyang.hu@qq.com>"]
-description = "ArceOS IPI management module"
+authors = ["KylinSoft Co., Ltd. <https://www.kylinos.cn/>"]
+description = "X-Kernel Inter-Processor Communication API"
 license.workspace = true
 homepage.workspace = true
-repository = "https://github.com/arceos-org/arceos/tree/main/modules/axipi"
-documentation = "https://arceos-org.github.io/arceos/axipi/index.html"
 
 [features]
 default = []
