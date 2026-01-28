@@ -1,0 +1,16 @@
+[package]
+name = "memset"
+description = "Data structures and operations for managing memory mappings"
+keywords = ["x-kernel", "virtual-memory", "memory-area", "mmap"]
+documentation.workspace = true
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+
+[dependencies]
+axerrno.workspace = true
+memaddr.workspace = true
