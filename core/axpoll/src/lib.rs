@@ -13,7 +13,7 @@ use core::{
 
 use bitflags::bitflags;
 use linux_raw_sys::general::*;
-use axsync::Mutex;
+use kspin::SpinNoIrq;
 
 bitflags! {
     /// I/O events.
@@ -65,9 +65,19 @@ pub trait Pollable {
 
 const POLL_SET_CAPACITY: usize = 64;
 
+#[cfg(feature = "stats")]
+#[derive(Debug, Default)]
+struct Stats {
+    register_count: usize,
+    wake_count: usize,
+}
+
 struct Inner {
     entries: [MaybeUninit<Waker>; POLL_SET_CAPACITY],
     cursor: usize,
+    #[cfg(feature = "stats")]
+    stats: Stats,
+    auto_wake_on_drop: bool,
 }
 
 impl Inner {
@@ -75,6 +85,25 @@ impl Inner {
         Self {
             entries: unsafe { MaybeUninit::uninit().assume_init() },
             cursor: 0,
+            #[cfg(feature = "stats")]
+            stats: Stats {
+                register_count: 0,
+                wake_count: 0,
+            },
+            auto_wake_on_drop: true,
+        }
+    }
+
+    const fn new_no_auto_wake() -> Self {
+        Self {
+            entries: unsafe { MaybeUninit::uninit().assume_init() },
+            cursor: 0,
+            #[cfg(feature = "stats")]
+            stats: Stats {
+                register_count: 0,
+                wake_count: 0,
+            },
+            auto_wake_on_drop: false,
         }
     }
 
@@ -87,6 +116,10 @@ impl Inner {
     }
 
     fn register(&mut self, waker: &Waker) {
+        #[cfg(feature = "stats")]
+        {
+            self.stats.register_count += 1;
+        }
         let slot = self.cursor % POLL_SET_CAPACITY;
         if self.cursor >= POLL_SET_CAPACITY {
             let old = unsafe { self.entries[slot].assume_init_read() };
@@ -103,14 +136,17 @@ impl Inner {
 
 impl Drop for Inner {
     fn drop(&mut self) {
-        for i in 0..self.len() {
-            unsafe { self.entries[i].assume_init_read() }.wake();
+        // Only wake if auto_wake_on_drop is enabled
+        if self.auto_wake_on_drop {
+            for i in 0..self.len() {
+                unsafe { self.entries[i].assume_init_read() }.wake();
+            }
         }
     }
 }
 
 /// A data structure for waking up tasks that are waiting for I/O events.
-pub struct PollSet(Mutex<Inner>);
+pub struct PollSet(SpinNoIrq<Inner>);
 
 impl Default for PollSet {
     fn default() -> Self {
@@ -121,7 +157,17 @@ impl Default for PollSet {
 impl PollSet {
     /// Creates a new empty [`PollSet`].
     pub const fn new() -> Self {
-        Self(Mutex::new(Inner::new()))
+        Self(SpinNoIrq::new(Inner::new()))
+    }
+
+    /// Creates a new empty [`PollSet`] that does not automatically wake on drop.
+    pub const fn new_no_auto_wake() -> Self {
+        Self(SpinNoIrq::new(Inner::new_no_auto_wake()))
+    }
+
+    /// Sets whether to automatically wake wakers on drop.
+    pub fn set_auto_wake_on_drop(&mut self, enabled: bool) {
+        self.0.get_mut().auto_wake_on_drop = enabled;
     }
 
     /// Registers a waker.
@@ -130,21 +176,57 @@ impl PollSet {
     }
 
     /// Wakes up all registered wakers.
+    /// 
+    /// This method safely extracts all wakers from the internal storage
+    /// before calling wake() on them, preventing potential deadlocks.
     pub fn wake(&self) -> usize {
-        let mut guard = self.0.lock();
-        if guard.is_empty() {
-            return 0;
+        // Extract all wakers while holding the lock
+        let (count, wakers) = {
+            let mut guard = self.0.lock();
+            if guard.is_empty() {
+                return 0;
+            }
+            let count = guard.len();
+            let mut wakers = [const { MaybeUninit::<Waker>::uninit() }; POLL_SET_CAPACITY];
+            // Move wakers out of the entries array
+            for i in 0..count {
+                // Use assume_init_read to move out of the MaybeUninit
+                wakers[i].write(unsafe { guard.entries[i].assume_init_read() });
+            }
+            guard.cursor = 0; // Reset cursor
+            #[cfg(feature = "stats")]
+            {
+                guard.stats.wake_count += 1;
+            }
+            drop(guard); // Release lock before calling wake()
+            (count, wakers)
+        };
+
+        // Call wake() on all extracted wakers outside the lock
+        for i in 0..count {
+            unsafe { wakers[i].assume_init_read() }.wake();
         }
-        let inner = core::mem::replace(&mut *guard, Inner::new());
-        drop(guard);
-        inner.len()
+        count
+    }
+
+    #[cfg(feature = "stats")]
+    /// Gets statistics about this [`PollSet`].
+    pub fn stats(&self) -> WakerStats {
+        let guard = self.0.lock();
+        WakerStats {
+            register_count: guard.stats.register_count,
+            wake_count: guard.stats.wake_count,
+            current_count: guard.len(),
+        }
     }
 }
 
 impl Drop for PollSet {
     fn drop(&mut self) {
-        // Ensure all entries are dropped
-        self.wake();
+        // Only wake if auto_wake_on_drop is enabled
+        if self.0.get_mut().auto_wake_on_drop {
+            self.wake();
+        }
     }
 }
 
@@ -156,5 +238,57 @@ impl alloc::task::Wake for PollSet {
 
     fn wake_by_ref(self: &alloc::sync::Arc<Self>) {
         self.as_ref().wake();
+    }
+}
+
+#[cfg(feature = "stats")]
+/// Statistics about waker registrations and wake-ups.
+#[derive(Debug, Clone, Copy)]
+pub struct WakerStats {
+    /// Total number of waker registrations.
+    pub register_count: usize,
+    /// Total number of wake-ups.
+    pub wake_count: usize,
+    /// Current number of registered wakers.
+    pub current_count: usize,
+}
+
+#[cfg(feature = "alloc")]
+/// A group of [`PollSet`]s for batch operations.
+pub struct PollSetGroup {
+    sets: alloc::vec::Vec<PollSet>,
+}
+
+#[cfg(feature = "alloc")]
+impl PollSetGroup {
+    /// Creates a new empty [`PollSetGroup`].
+    pub fn new() -> Self {
+        Self {
+            sets: alloc::vec::Vec::new(),
+        }
+    }
+
+    /// Adds a [`PollSet`] to the group.
+    pub fn add(&mut self, set: PollSet) {
+        self.sets.push(set);
+    }
+
+    /// Wakes up all registered wakers in all [`PollSet`]s in the group.
+    pub fn wake_all(&self) -> usize {
+        self.sets.iter().map(|s| s.wake()).sum()
+    }
+
+    /// Registers a waker with all [`PollSet`]s in the group.
+    pub fn register_all(&self, waker: &Waker) {
+        for set in &self.sets {
+            set.register(waker);
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Default for PollSetGroup {
+    fn default() -> Self {
+        Self::new()
     }
 }
