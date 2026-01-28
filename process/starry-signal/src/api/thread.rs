@@ -5,7 +5,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use axcpu::uspace::UserContext;
+use kcpu::userspace::UserContext;
 use kspin::SpinNoIrq;
 use starry_vm::VmMutPtr;
 

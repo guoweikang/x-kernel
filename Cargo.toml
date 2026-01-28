@@ -48,7 +48,7 @@ axruntime = { path = "core/axruntime" }
 axsync = { path = "core/axsync" }
 axtask = { path = "core/axtask" }
 axwatchdog = { path = "io/axwatchdog" }
-axcpu = { path = "arch/axcpu" }
+kcpu = { path = "arch/kcpu" }
 
 # Arceos Crates
 alloc-engine = { path = "mm/alloc-engine", features = ["axerrno"] }
@@ -83,7 +83,7 @@ aarch64-crosvm-virt = { path = "platforms/aarch64-crosvm-virt" }
 # Third-Party Crates
 arm-gic = { path = "drivers/arm-gic" }
 rs_fdtree = { path = "drivers/rs-fdtree" }
-syscalls = { path = "api/syscalls" , default-features = false }
+syscalls = { path = "api/syscalls", default-features = false }
 bitflags = "2.10"
 bytemuck = { version = "1.23", features = ["unsound_ptr_pod_impl"] }
 cfg-if = "1.0"
