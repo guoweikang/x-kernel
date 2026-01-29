@@ -1,15 +1,9 @@
 #![cfg_attr(not(test), no_std)]
-#![doc = include_str!("../README.md")]
 
 use core::fmt;
 
+pub use linux_sysno::Errno as LinuxError;
 use strum::EnumCount;
-
-mod linux_errno {
-    include!(concat!(env!("OUT_DIR"), "/linux_errno.rs"));
-}
-
-pub use linux_errno::LinuxError;
 
 /// The error kind type used by ArceOS.
 ///
@@ -19,7 +13,7 @@ pub use linux_errno::LinuxError;
 #[repr(i32)]
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, EnumCount)]
-pub enum AxErrorKind {
+pub enum KErrorKind {
     /// A socket address could not be bound because the address is already in use elsewhere.
     AddrInUse = 1,
     /// The socket is already connected.
@@ -63,7 +57,7 @@ pub enum AxErrorKind {
     /// For example, a function that reads a file into a string will error with
     /// `InvalidData` if the file's contents are not valid UTF-8.
     ///
-    /// [`InvalidInput`]: AxErrorKind::InvalidInput
+    /// [`InvalidInput`]: KErrorKind::InvalidInput
     InvalidData,
     /// Invalid executable format.
     InvalidExecutable,
@@ -122,10 +116,10 @@ pub enum AxErrorKind {
     WriteZero,
 }
 
-impl AxErrorKind {
+impl KErrorKind {
     /// Returns the error description.
     pub fn as_str(&self) -> &'static str {
-        use AxErrorKind::*;
+        use KErrorKind::*;
         match *self {
             AddrInUse => "Address in use",
             AlreadyConnected => "Already connected",
@@ -179,120 +173,118 @@ impl AxErrorKind {
     }
 }
 
-impl TryFrom<i32> for AxErrorKind {
+impl TryFrom<i32> for KErrorKind {
     type Error = i32;
 
     #[inline]
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value > 0 && value <= AxErrorKind::COUNT as i32 {
-            Ok(unsafe { core::mem::transmute::<i32, AxErrorKind>(value) })
+        if value > 0 && value <= KErrorKind::COUNT as i32 {
+            Ok(unsafe { core::mem::transmute::<i32, KErrorKind>(value) })
         } else {
             Err(value)
         }
     }
 }
 
-impl fmt::Display for AxErrorKind {
+impl fmt::Display for KErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
 
-impl From<AxErrorKind> for LinuxError {
-    fn from(e: AxErrorKind) -> Self {
-        use AxErrorKind::*;
-        use LinuxError::*;
+impl From<KErrorKind> for LinuxError {
+    fn from(e: KErrorKind) -> Self {
+        use KErrorKind::*;
         match e {
-            AddrInUse => EADDRINUSE,
-            AlreadyConnected => EISCONN,
-            AlreadyExists => EEXIST,
-            ArgumentListTooLong => E2BIG,
-            BadAddress | BadState => EFAULT,
-            BadFileDescriptor => EBADF,
-            BrokenPipe => EPIPE,
-            ConnectionRefused => ECONNREFUSED,
-            ConnectionReset => ECONNRESET,
-            CrossesDevices => EXDEV,
-            DirectoryNotEmpty => ENOTEMPTY,
-            FilesystemLoop => ELOOP,
-            IllegalBytes => EILSEQ,
-            InProgress => EINPROGRESS,
-            Interrupted => EINTR,
-            InvalidExecutable => ENOEXEC,
-            InvalidInput | InvalidData => EINVAL,
-            Io => EIO,
-            IsADirectory => EISDIR,
-            NameTooLong => ENAMETOOLONG,
-            NoMemory => ENOMEM,
-            NoSuchDevice => ENODEV,
-            NoSuchProcess => ESRCH,
-            NotADirectory => ENOTDIR,
-            NotASocket => ENOTSOCK,
-            NotATty => ENOTTY,
-            NotConnected => ENOTCONN,
-            NotFound => ENOENT,
-            OperationNotPermitted => EPERM,
-            OperationNotSupported => EOPNOTSUPP,
-            OutOfRange => ERANGE,
-            PermissionDenied => EACCES,
-            ReadOnlyFilesystem => EROFS,
-            ResourceBusy => EBUSY,
-            StorageFull => ENOSPC,
-            TimedOut => ETIMEDOUT,
-            TooManyOpenFiles => EMFILE,
-            UnexpectedEof | WriteZero => EIO,
-            Unsupported => ENOSYS,
-            WouldBlock => EAGAIN,
+            AddrInUse => LinuxError::EADDRINUSE,
+            AlreadyConnected => LinuxError::EISCONN,
+            AlreadyExists => LinuxError::EEXIST,
+            ArgumentListTooLong => LinuxError::E2BIG,
+            BadAddress | BadState => LinuxError::EFAULT,
+            BadFileDescriptor => LinuxError::EBADF,
+            BrokenPipe => LinuxError::EPIPE,
+            ConnectionRefused => LinuxError::ECONNREFUSED,
+            ConnectionReset => LinuxError::ECONNRESET,
+            CrossesDevices => LinuxError::EXDEV,
+            DirectoryNotEmpty => LinuxError::ENOTEMPTY,
+            FilesystemLoop => LinuxError::ELOOP,
+            IllegalBytes => LinuxError::EILSEQ,
+            InProgress => LinuxError::EINPROGRESS,
+            Interrupted => LinuxError::EINTR,
+            InvalidExecutable => LinuxError::ENOEXEC,
+            InvalidInput | InvalidData => LinuxError::EINVAL,
+            Io => LinuxError::EIO,
+            IsADirectory => LinuxError::EISDIR,
+            NameTooLong => LinuxError::ENAMETOOLONG,
+            NoMemory => LinuxError::ENOMEM,
+            NoSuchDevice => LinuxError::ENODEV,
+            NoSuchProcess => LinuxError::ESRCH,
+            NotADirectory => LinuxError::ENOTDIR,
+            NotASocket => LinuxError::ENOTSOCK,
+            NotATty => LinuxError::ENOTTY,
+            NotConnected => LinuxError::ENOTCONN,
+            NotFound => LinuxError::ENOENT,
+            OperationNotPermitted => LinuxError::EPERM,
+            OperationNotSupported => LinuxError::EOPNOTSUPP,
+            OutOfRange => LinuxError::ERANGE,
+            PermissionDenied => LinuxError::EACCES,
+            ReadOnlyFilesystem => LinuxError::EROFS,
+            ResourceBusy => LinuxError::EBUSY,
+            StorageFull => LinuxError::ENOSPC,
+            TimedOut => LinuxError::ETIMEDOUT,
+            TooManyOpenFiles => LinuxError::EMFILE,
+            UnexpectedEof | WriteZero => LinuxError::EIO,
+            Unsupported => LinuxError::ENOSYS,
+            WouldBlock => LinuxError::EAGAIN,
         }
     }
 }
 
-impl TryFrom<LinuxError> for AxErrorKind {
+impl TryFrom<LinuxError> for KErrorKind {
     type Error = LinuxError;
 
     fn try_from(e: LinuxError) -> Result<Self, Self::Error> {
-        use AxErrorKind::*;
-        use LinuxError::*;
+        use KErrorKind::*;
         Ok(match e {
-            EADDRINUSE => AddrInUse,
-            EISCONN => AlreadyConnected,
-            EEXIST => AlreadyExists,
-            E2BIG => ArgumentListTooLong,
-            EFAULT => BadAddress,
-            EBADF => BadFileDescriptor,
-            EPIPE => BrokenPipe,
-            ECONNREFUSED => ConnectionRefused,
-            ECONNRESET => ConnectionReset,
-            EXDEV => CrossesDevices,
-            ENOTEMPTY => DirectoryNotEmpty,
-            ELOOP => FilesystemLoop,
-            EILSEQ => IllegalBytes,
-            EINPROGRESS => InProgress,
-            EINTR => Interrupted,
-            ENOEXEC => InvalidExecutable,
-            EINVAL => InvalidInput,
-            EIO => Io,
-            EISDIR => IsADirectory,
-            ENAMETOOLONG => NameTooLong,
-            ENOMEM => NoMemory,
-            ENODEV => NoSuchDevice,
-            ESRCH => NoSuchProcess,
-            ENOTDIR => NotADirectory,
-            ENOTSOCK => NotASocket,
-            ENOTTY => NotATty,
-            ENOTCONN => NotConnected,
-            ENOENT => NotFound,
-            EPERM => OperationNotPermitted,
-            EOPNOTSUPP => OperationNotSupported,
-            ERANGE => OutOfRange,
-            EACCES => PermissionDenied,
-            EROFS => ReadOnlyFilesystem,
-            EBUSY => ResourceBusy,
-            ENOSPC => StorageFull,
-            ETIMEDOUT => TimedOut,
-            EMFILE => TooManyOpenFiles,
-            ENOSYS => Unsupported,
-            EAGAIN => WouldBlock,
+            LinuxError::EADDRINUSE => AddrInUse,
+            LinuxError::EISCONN => AlreadyConnected,
+            LinuxError::EEXIST => AlreadyExists,
+            LinuxError::E2BIG => ArgumentListTooLong,
+            LinuxError::EFAULT => BadAddress,
+            LinuxError::EBADF => BadFileDescriptor,
+            LinuxError::EPIPE => BrokenPipe,
+            LinuxError::ECONNREFUSED => ConnectionRefused,
+            LinuxError::ECONNRESET => ConnectionReset,
+            LinuxError::EXDEV => CrossesDevices,
+            LinuxError::ENOTEMPTY => DirectoryNotEmpty,
+            LinuxError::ELOOP => FilesystemLoop,
+            LinuxError::EILSEQ => IllegalBytes,
+            LinuxError::EINPROGRESS => InProgress,
+            LinuxError::EINTR => Interrupted,
+            LinuxError::ENOEXEC => InvalidExecutable,
+            LinuxError::EINVAL => InvalidInput,
+            LinuxError::EIO => Io,
+            LinuxError::EISDIR => IsADirectory,
+            LinuxError::ENAMETOOLONG => NameTooLong,
+            LinuxError::ENOMEM => NoMemory,
+            LinuxError::ENODEV => NoSuchDevice,
+            LinuxError::ESRCH => NoSuchProcess,
+            LinuxError::ENOTDIR => NotADirectory,
+            LinuxError::ENOTSOCK => NotASocket,
+            LinuxError::ENOTTY => NotATty,
+            LinuxError::ENOTCONN => NotConnected,
+            LinuxError::ENOENT => NotFound,
+            LinuxError::EPERM => OperationNotPermitted,
+            LinuxError::EOPNOTSUPP => OperationNotSupported,
+            LinuxError::ERANGE => OutOfRange,
+            LinuxError::EACCES => PermissionDenied,
+            LinuxError::EROFS => ReadOnlyFilesystem,
+            LinuxError::EBUSY => ResourceBusy,
+            LinuxError::ENOSPC => StorageFull,
+            LinuxError::ETIMEDOUT => TimedOut,
+            LinuxError::EMFILE => TooManyOpenFiles,
+            LinuxError::ENOSYS => Unsupported,
+            LinuxError::EAGAIN => WouldBlock,
             _ => {
                 return Err(e);
             }
@@ -303,27 +295,27 @@ impl TryFrom<LinuxError> for AxErrorKind {
 /// The error type used by ArceOS.
 #[repr(transparent)]
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct AxError(i32);
+pub struct KError(i32);
 
-enum AxErrorData {
-    Ax(AxErrorKind),
+enum KErrorData {
+    Ky(KErrorKind),
     Linux(LinuxError),
 }
 
-impl AxError {
-    const fn new_ax(kind: AxErrorKind) -> Self {
-        AxError(kind.code())
+impl KError {
+    const fn new_ax(kind: KErrorKind) -> Self {
+        KError(kind.code())
     }
 
-    const fn new_linux(kind: LinuxError) -> Self {
-        AxError(-kind.code())
+    fn new_linux(kind: LinuxError) -> Self {
+        KError(-kind.into_raw())
     }
 
-    const fn data(&self) -> AxErrorData {
+    fn data(&self) -> KErrorData {
         if self.0 < 0 {
-            AxErrorData::Linux(unsafe { core::mem::transmute::<i32, LinuxError>(-self.0) })
+            KErrorData::Linux(LinuxError::new(-self.0))
         } else {
-            AxErrorData::Ax(unsafe { core::mem::transmute::<i32, AxErrorKind>(self.0) })
+            KErrorData::Ky(unsafe { core::mem::transmute::<i32, KErrorKind>(self.0) })
         }
     }
 
@@ -335,96 +327,99 @@ impl AxError {
     /// Returns a canonicalized version of this error.
     ///
     /// This method tries to convert [`LinuxError`] variants into their
-    /// corresponding [`AxErrorKind`] variants if possible.
+    /// corresponding [`KErrorKind`] variants if possible.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use axerrno::{AxError, AxErrorKind, LinuxError};
-    /// let linux_err = AxError::from(LinuxError::EACCES);
+    /// # use kerrno::{KError, KErrorKind, LinuxError};
+    /// let linux_err = KError::from(LinuxError::EACCES);
     /// let canonical_err = linux_err.canonicalize();
-    /// assert_eq!(canonical_err, AxError::from(AxErrorKind::PermissionDenied));
+    /// assert_eq!(canonical_err, KError::from(KErrorKind::PermissionDenied));
     /// ```
     pub fn canonicalize(self) -> Self {
-        AxErrorKind::try_from(self).map_or_else(Into::into, Into::into)
+        KErrorKind::try_from(self).map_or_else(Into::into, Into::into)
     }
 }
 
-impl<E: Into<AxErrorKind>> From<E> for AxError {
+impl<E: Into<KErrorKind>> From<E> for KError {
     fn from(e: E) -> Self {
-        AxError::new_ax(e.into())
+        KError::new_ax(e.into())
     }
 }
 
-impl From<LinuxError> for AxError {
+impl From<LinuxError> for KError {
     fn from(e: LinuxError) -> Self {
-        AxError::new_linux(e)
+        KError::new_linux(e)
     }
 }
 
-impl From<AxError> for LinuxError {
-    fn from(e: AxError) -> Self {
+impl From<KError> for LinuxError {
+    fn from(e: KError) -> Self {
         match e.data() {
-            AxErrorData::Ax(kind) => LinuxError::from(kind),
-            AxErrorData::Linux(kind) => kind,
+            KErrorData::Ky(kind) => LinuxError::from(kind),
+            KErrorData::Linux(kind) => kind,
         }
     }
 }
 
-impl TryFrom<AxError> for AxErrorKind {
+impl TryFrom<KError> for KErrorKind {
     type Error = LinuxError;
 
-    fn try_from(e: AxError) -> Result<Self, Self::Error> {
+    fn try_from(e: KError) -> Result<Self, Self::Error> {
         match e.data() {
-            AxErrorData::Ax(kind) => Ok(kind),
-            AxErrorData::Linux(e) => e.try_into(),
+            KErrorData::Ky(kind) => Ok(kind),
+            KErrorData::Linux(e) => e.try_into(),
         }
     }
 }
 
-impl TryFrom<i32> for AxError {
-    type Error = i32;
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if AxErrorKind::try_from(value).is_ok() || LinuxError::try_from(-value).is_ok() {
-            Ok(AxError(value))
-        } else {
-            Err(value)
+impl KError {
+    pub fn try_from_i32(value: i32) -> Result<Self, i32> {
+        if KErrorKind::try_from(value).is_ok() {
+            return Ok(KError(value));
         }
+        if value < 0 {
+            let linux = LinuxError::new(-value);
+            if linux.name().is_some() {
+                return Ok(KError(value));
+            }
+        }
+        Err(value)
     }
 }
 
-impl fmt::Debug for AxError {
+impl fmt::Debug for KError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.data() {
-            AxErrorData::Ax(kind) => write!(f, "AxErrorKind::{:?}", kind),
-            AxErrorData::Linux(kind) => write!(f, "LinuxError::{:?}", kind),
+            KErrorData::Ky(kind) => write!(f, "KErrorKind::{:?}", kind),
+            KErrorData::Linux(kind) => write!(f, "LinuxError::{:?}", kind),
         }
     }
 }
 
-impl fmt::Display for AxError {
+impl fmt::Display for KError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.data() {
-            AxErrorData::Ax(kind) => write!(f, "{}", kind),
-            AxErrorData::Linux(kind) => write!(f, "{}", kind),
+            KErrorData::Ky(kind) => write!(f, "{}", kind),
+            KErrorData::Linux(kind) => write!(f, "{}", kind),
         }
     }
 }
 
-macro_rules! axerror_consts {
+macro_rules! kerror_consts {
     ($($name:ident),*) => {
         #[allow(non_upper_case_globals)]
-        impl AxError {
+        impl KError {
             $(
-                #[doc = concat!("An [`AxError`] with kind [`AxErrorKind::", stringify!($name), "`].")]
-                pub const $name: Self = Self::new_ax(AxErrorKind::$name);
+                #[doc = concat!("An [`KError`] with kind [`KErrorKind::", stringify!($name), "`].")]
+                pub const $name: Self = Self::new_ax(KErrorKind::$name);
             )*
         }
     };
 }
 
-axerror_consts!(
+kerror_consts!(
     AddrInUse,
     AlreadyConnected,
     AlreadyExists,
@@ -470,38 +465,38 @@ axerror_consts!(
     WriteZero
 );
 
-/// A specialized [`Result`] type with [`AxError`] as the error type.
-pub type AxResult<T = ()> = Result<T, AxError>;
+/// A specialized [`Result`] type with [`KError`] as the error type.
+pub type KResult<T = ()> = Result<T, KError>;
 
-/// Convenience method to construct an [`AxError`] type while printing a warning
+/// Convenience method to construct an [`KError`] type while printing a warning
 /// message.
 ///
 /// # Examples
 ///
 /// ```
-/// # use axerrno::{ax_err_type, AxError};
+/// # use kerrno::{k_err_type, KError};
 /// #
-/// // Also print "[AxError::AlreadyExists]" if the `log` crate is enabled.
-/// assert_eq!(ax_err_type!(AlreadyExists), AxError::AlreadyExists,);
+/// // Also print "[KError::AlreadyExists]" if the `log` crate is enabled.
+/// assert_eq!(k_err_type!(AlreadyExists), KError::AlreadyExists,);
 ///
-/// // Also print "[AxError::BadAddress] the address is 0!" if the `log` crate
+/// // Also print "[KError::BadAddress] the address is 0!" if the `log` crate
 /// // is enabled.
 /// assert_eq!(
-///     ax_err_type!(BadAddress, "the address is 0!"),
-///     AxError::BadAddress,
+///     k_err_type!(BadAddress, "the address is 0!"),
+///     KError::BadAddress,
 /// );
 /// ```
 #[macro_export]
-macro_rules! ax_err_type {
+macro_rules! k_err_type {
     ($err:ident) => {{
-        use $crate::AxErrorKind::*;
-        let err = $crate::AxError::from($err);
+        use $crate::KErrorKind::*;
+        let err = $crate::KError::from($err);
         $crate::__priv::warn!("[{:?}]", err);
         err
     }};
     ($err:ident, $msg:expr) => {{
-        use $crate::AxErrorKind::*;
-        let err = $crate::AxError::from($err);
+        use $crate::KErrorKind::*;
+        let err = $crate::KError::from($err);
         $crate::__priv::warn!("[{:?}] {}", err, $msg);
         err
     }};
@@ -513,10 +508,10 @@ macro_rules! ax_err_type {
 /// ## Examples
 ///
 /// ```rust
-/// # use axerrno::{ensure, ax_err, AxError, AxResult};
+/// # use kerrno::{ensure, k_err, KError, KResult};
 ///
-/// fn example(user_id: i32) -> AxResult {
-///     ensure!(user_id > 0, ax_err!(InvalidInput));
+/// fn example(user_id: i32) -> KResult {
+///     ensure!(user_id > 0, k_err!(InvalidInput));
 ///     // After this point, we know that `user_id` is positive.
 ///     let user_id = user_id as u32;
 ///     Ok(())
@@ -531,54 +526,48 @@ macro_rules! ensure {
     };
 }
 
-/// Convenience method to construct an [`Err(AxError)`] type while printing a
+/// Convenience method to construct an [`Err(KError)`] type while printing a
 /// warning message.
 ///
 /// # Examples
 ///
 /// ```
-/// # use axerrno::{ax_err, AxResult, AxError};
+/// # use kerrno::{k_err, KResult, KError};
 /// #
-/// // Also print "[AxError::AlreadyExists]" if the `log` crate is enabled.
+/// // Also print "[KError::AlreadyExists]" if the `log` crate is enabled.
 /// assert_eq!(
-///     ax_err!(AlreadyExists),
-///     AxResult::<()>::Err(AxError::AlreadyExists),
+///     k_err!(AlreadyExists),
+///     KResult::<()>::Err(KError::AlreadyExists),
 /// );
 ///
-/// // Also print "[AxError::BadAddress] the address is 0!" if the `log` crate is enabled.
+/// // Also print "[KError::BadAddress] the address is 0!" if the `log` crate is enabled.
 /// assert_eq!(
-///     ax_err!(BadAddress, "the address is 0!"),
-///     AxResult::<()>::Err(AxError::BadAddress),
+///     k_err!(BadAddress, "the address is 0!"),
+///     KResult::<()>::Err(KError::BadAddress),
 /// );
 /// ```
-/// [`Err(AxError)`]: Err
+/// [`Err(KError)`]: Err
 #[macro_export]
-macro_rules! ax_err {
+macro_rules! k_err {
     ($err:ident) => {
-        Err($crate::ax_err_type!($err))
+        Err($crate::k_err_type!($err))
     };
     ($err:ident, $msg:expr) => {
-        Err($crate::ax_err_type!($err, $msg))
+        Err($crate::k_err_type!($err, $msg))
     };
 }
 
-/// Throws an error of type [`AxError`] with the given error code, optionally
+/// Throws an error of type [`KError`] with the given error code, optionally
 /// with a message.
 #[macro_export]
-macro_rules! ax_bail {
+macro_rules! k_bail {
     ($($t:tt)*) => {
-        return $crate::ax_err!($($t)*);
+        return $crate::k_err!($($t)*);
     };
 }
 
 /// A specialized [`Result`] type with [`LinuxError`] as the error type.
 pub type LinuxResult<T = ()> = Result<T, LinuxError>;
-
-impl fmt::Display for LinuxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
 
 #[doc(hidden)]
 pub mod __priv {
@@ -589,31 +578,32 @@ pub mod __priv {
 mod tests {
     use strum::EnumCount;
 
-    use crate::{AxError, AxErrorKind, LinuxError};
+    use crate::{KError, KErrorKind, LinuxError};
 
     #[test]
     fn test_try_from() {
-        let max_code = AxErrorKind::COUNT as i32;
+        let max_code = KErrorKind::COUNT as i32;
         assert_eq!(max_code, 43);
-        assert_eq!(max_code, AxError::WriteZero.code());
+        assert_eq!(max_code, KError::WriteZero.code());
 
-        assert_eq!(AxError::AddrInUse.code(), 1);
-        assert_eq!(Ok(AxError::AddrInUse), AxError::try_from(1));
-        assert_eq!(Ok(AxError::AlreadyConnected), AxError::try_from(2));
-        assert_eq!(Ok(AxError::WriteZero), AxError::try_from(max_code));
-        assert_eq!(Err(max_code + 1), AxError::try_from(max_code + 1));
-        assert_eq!(Err(0), AxError::try_from(0));
-        assert_eq!(Err(i32::MAX), AxError::try_from(i32::MAX));
+        assert_eq!(KError::AddrInUse.code(), 1);
+        assert_eq!(Ok(KError::AddrInUse), KError::try_from_i32(1));
+        assert_eq!(Ok(KError::AlreadyConnected), KError::try_from_i32(2));
+        assert_eq!(Ok(KError::WriteZero), KError::try_from_i32(max_code));
+        assert_eq!(Err(max_code + 1), KError::try_from_i32(max_code + 1));
+        assert_eq!(Err(0), KError::try_from_i32(0));
+        assert_eq!(Err(i32::MAX), KError::try_from_i32(i32::MAX));
     }
 
     #[test]
     fn test_conversion() {
         for i in 1.. {
-            let Ok(err) = LinuxError::try_from(i) else {
+            let err = LinuxError::new(i);
+            if err.name().is_none() {
                 break;
-            };
-            assert_eq!(err as i32, i);
-            let e = AxError::from(err);
+            }
+            assert_eq!(err.into_raw(), i);
+            let e = KError::from(err);
             assert_eq!(e.code(), -i);
             assert_eq!(LinuxError::from(e), err);
         }

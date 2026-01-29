@@ -1,7 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::ops::Deref;
 
-use axerrno::AxResult;
+use kerrno::KResult;
 use khal::paging::{MappingFlags, PageSize, PageTableMut};
 use ksync::Mutex;
 use memaddr::{MemoryAddr, PhysAddr, VirtAddr, VirtAddrRange};
@@ -9,7 +9,7 @@ use memaddr::{MemoryAddr, PhysAddr, VirtAddr, VirtAddrRange};
 use super::{alloc_frame, dealloc_frame};
 use crate::{
     aspace::AddrSpace,
-    backend::{Backend, BackendOps, divide_page, pages_in},
+    backend::{Backend, BackendOps, divide_page, map_paging_err, pages_in},
 };
 
 pub struct SharedPages {
@@ -17,11 +17,11 @@ pub struct SharedPages {
     pub size: PageSize,
 }
 impl SharedPages {
-    pub fn new(size: usize, pgsize: PageSize) -> AxResult<Self> {
+    pub fn new(size: usize, pgsize: PageSize) -> KResult<Self> {
         Ok(Self {
             phys_pages: (0..divide_page(size, pgsize))
                 .map(|_| alloc_frame(true, pgsize))
-                .collect::<AxResult<_>>()?,
+                .collect::<KResult<_>>()?,
             size: pgsize,
         })
     }
@@ -74,20 +74,22 @@ impl BackendOps for SharedBackend {
         self.pages.size
     }
 
-    fn map(&self, range: VirtAddrRange, flags: MappingFlags, pgtbl: &mut PageTableMut) -> AxResult {
+    fn map(&self, range: VirtAddrRange, flags: MappingFlags, pgtbl: &mut PageTableMut) -> KResult {
         debug!("Shared::map: {:?} {:?}", range, flags);
         for (vaddr, paddr) in
             pages_in(range, self.pages.size)?.zip(self.pages_starting_from(range.start))
         {
-            pgtbl.map(vaddr, *paddr, self.pages.size, flags)?;
+            pgtbl
+                .map(vaddr, *paddr, self.pages.size, flags)
+                .map_err(map_paging_err)?;
         }
         Ok(())
     }
 
-    fn unmap(&self, range: VirtAddrRange, pgtbl: &mut PageTableMut) -> AxResult {
+    fn unmap(&self, range: VirtAddrRange, pgtbl: &mut PageTableMut) -> KResult {
         debug!("Shared::unmap: {:?}", range);
         for vaddr in pages_in(range, self.pages.size)? {
-            pgtbl.unmap(vaddr)?;
+            pgtbl.unmap(vaddr).map_err(map_paging_err)?;
         }
         Ok(())
     }
@@ -99,7 +101,7 @@ impl BackendOps for SharedBackend {
         _old_pgtbl: &mut PageTableMut,
         _new_pgtbl: &mut PageTableMut,
         _new_aspace: &Arc<Mutex<AddrSpace>>,
-    ) -> AxResult<Backend> {
+    ) -> KResult<Backend> {
         Ok(Backend::Shared(self.clone()))
     }
 }

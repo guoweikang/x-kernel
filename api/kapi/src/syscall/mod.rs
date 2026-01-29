@@ -10,7 +10,7 @@ mod sys;
 mod task;
 mod time;
 
-use axerrno::{AxError, LinuxError};
+use kerrno::{KError, LinuxError};
 use khal::uspace::UserContext;
 use linux_sysno::Sysno;
 
@@ -22,7 +22,7 @@ use self::{
 pub fn dispatch_irq_syscall(uctx: &mut UserContext) {
     let Some(sysno) = Sysno::new(uctx.sysno()) else {
         warn!("Invalid syscall number: {}", uctx.sysno());
-        uctx.set_retval(-LinuxError::ENOSYS.code() as _);
+        uctx.set_retval(-LinuxError::ENOSYS.into_raw() as _);
         return;
     };
 
@@ -638,11 +638,11 @@ pub fn dispatch_irq_syscall(uctx: &mut UserContext) {
             #[cfg(not(feature = "tee"))]
             {
                 warn!("Unimplemented syscall: {sysno}");
-                Err(AxError::Unsupported)
+                Err(KError::Unsupported)
             }
         }
     };
     debug!("Syscall {sysno} return {result:?}");
 
-    uctx.set_retval(result.unwrap_or_else(|err| -LinuxError::from(err).code() as _) as _);
+    uctx.set_retval(result.unwrap_or_else(|err| -LinuxError::from(err).into_raw() as _) as _);
 }

@@ -30,8 +30,8 @@ pub use slab::SlabByteAllocator;
 mod tlsf;
 use core::{alloc::Layout, ptr::NonNull};
 
-#[cfg(feature = "axerrno")]
-use axerrno::AxError;
+#[cfg(feature = "kerrno")]
+use kerrno::KError;
 #[cfg(feature = "tlsf")]
 pub use tlsf::TlsfByteAllocator;
 
@@ -48,12 +48,12 @@ pub enum AllocError {
     NotAllocated,
 }
 
-#[cfg(feature = "axerrno")]
-impl From<AllocError> for AxError {
+#[cfg(feature = "kerrno")]
+impl From<AllocError> for KError {
     fn from(value: AllocError) -> Self {
         match value {
-            AllocError::NoMemory => AxError::NoMemory,
-            _ => AxError::InvalidInput,
+            AllocError::NoMemory => KError::NoMemory,
+            _ => KError::InvalidInput,
         }
     }
 }
