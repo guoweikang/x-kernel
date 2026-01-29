@@ -56,7 +56,7 @@ memset = { path = "mm/memset" }
 kspin = { path = "sync/kspin" }
 
 # x-kenrel userspace Modules
-starry-signal = { version = "0.2", path = "process/starry-signal" }
+ksignal = { path = "process/ksignal" }
 starry-core = { path = "api/starry-core" }
 starry-api = { path = "api/starry-api" }
 kprocess = { path = "process/kprocess" }
@@ -102,6 +102,7 @@ crate_interface = "0.1.4"
 chrono = { version = "0.4", default-features = false }
 enum_dispatch = "0.3"
 lock_api = { version = "0.4", default-features = false }
+strum = { version = "0.27", default-features = false, features = ["derive"] }
 
 # Tee Crates
 tee_raw_sys = { path = "tee/tee_raw_sys" }

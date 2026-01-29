@@ -7,6 +7,7 @@ use core::{
 
 use axerrno::{AxError, AxResult};
 use kpoll::{IoEvents, PollSet, Pollable};
+use ksignal::{SignalInfo, Signo};
 use ksync::Mutex;
 use ktask::{
     current,
@@ -19,7 +20,6 @@ use ringbuf::{
     traits::{Consumer, Observer, Producer},
 };
 use starry_core::task::{AsThread, send_signal_to_process};
-use starry_signal::{SignalInfo, Signo};
 use starry_vm::VmMutPtr;
 
 use super::{FileLike, Kstat};

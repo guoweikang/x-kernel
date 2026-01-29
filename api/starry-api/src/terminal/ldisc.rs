@@ -8,6 +8,7 @@ use core::{
 
 use axerrno::{AxError, AxResult};
 use kpoll::{IoEvents, PollSet, Pollable};
+use ksignal::SignalInfo;
 use ktask::future::{block_on, poll_io};
 use linux_raw_sys::general::{
     ECHOCTL, ECHOK, ICRNL, IGNCR, ISIG, VEOF, VERASE, VKILL, VMIN, VTIME,
@@ -17,7 +18,6 @@ use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
 };
 use starry_core::task::send_signal_to_process_group;
-use starry_signal::SignalInfo;
 
 use crate::terminal::{Terminal, termios::Termios2};
 

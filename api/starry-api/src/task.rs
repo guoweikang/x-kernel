@@ -4,6 +4,7 @@ use axerrno::{AxError, AxResult};
 use bytemuck::AnyBitPattern;
 use khal::uspace::{ExceptionKind, ReturnReason, UserContext};
 use kprocess::Pid;
+use ksignal::{SignalInfo, Signo};
 use ktask::{TaskInner, current};
 use linux_raw_sys::general::ROBUST_LIST_LIMIT;
 use starry_core::{
@@ -15,7 +16,6 @@ use starry_core::{
     },
     time::TimerState,
 };
-use starry_signal::{SignalInfo, Signo};
 use starry_vm::{VmMutPtr, VmPtr};
 
 use crate::{

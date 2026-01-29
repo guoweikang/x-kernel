@@ -2,9 +2,9 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use axerrno::AxResult;
 use khal::uspace::UserContext;
+use ksignal::{SignalOSAction, SignalSet};
 use ktask::current;
 use starry_core::task::{AsThread, Thread};
-use starry_signal::{SignalOSAction, SignalSet};
 
 use crate::task::do_exit;
 

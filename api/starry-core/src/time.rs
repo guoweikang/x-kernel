@@ -5,13 +5,13 @@ use core::{mem, time::Duration};
 
 use event_listener::{Event, listener};
 use khal::time::{NANOS_PER_SEC, TimeValue, monotonic_time_nanos, wall_time};
+use ksignal::Signo;
 use ktask::{
     WeakKtaskRef, current,
     future::{block_on, timeout_at},
 };
 use lazy_static::lazy_static;
 use spin::Mutex;
-use starry_signal::Signo;
 use strum::FromRepr;
 
 use crate::task::poll_timer;

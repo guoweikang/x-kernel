@@ -7,13 +7,13 @@ use core::{
 
 use axerrno::{AxError, AxResult};
 use kpoll::{IoEvents, PollSet, Pollable};
+use ksignal::{SignalInfo, SignalSet};
 use ktask::{
     current,
     future::{block_on, poll_io},
 };
 use spin::RwLock;
 use starry_core::task::AsThread;
-use starry_signal::{SignalInfo, SignalSet};
 use zerocopy::{Immutable, IntoBytes};
 
 use crate::file::{FileLike, IoDst, IoSrc};
