@@ -9,11 +9,11 @@ use ksignal::Signo;
 use kspin::SpinNoIrq;
 use ktask::{KTaskExt, current, spawn_task};
 use linux_raw_sys::general::*;
+use osvm::VirtMutPtr;
 use starry_core::{
     mm::copy_from_kernel,
     task::{AsThread, ProcessData, Thread, add_task_to_table},
 };
-use starry_vm::VmMutPtr;
 
 use crate::{
     file::{FD_TABLE, FileLike, PidFd},
@@ -140,7 +140,7 @@ pub fn sys_clone(
 
     let tid = new_task.id().as_u64() as Pid;
     if flags.contains(CloneFlags::PARENT_SETTID) {
-        (parent_tid as *mut Pid).vm_write(tid).ok();
+        (parent_tid as *mut Pid).write_vm(tid).ok();
     }
 
     let new_proc_data = if flags.contains(CloneFlags::THREAD) {
@@ -213,7 +213,7 @@ pub fn sys_clone(
 
     if flags.contains(CloneFlags::PIDFD) {
         let pidfd = PidFd::new(&new_proc_data);
-        (parent_tid as *mut i32).vm_write(pidfd.add_to_fd_table(true)?)?;
+        (parent_tid as *mut i32).write_vm(pidfd.add_to_fd_table(true)?)?;
     }
 
     let thr = Thread::new(tid, new_proc_data);
