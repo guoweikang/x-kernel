@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["entry", "util/macros"]
+members = ["entry"]
 exclude = []
 
 [workspace.package]
@@ -11,24 +11,13 @@ license = "Apache-2.0"
 authors = ["KylinSoft Co., Ltd. <https://www.kylinos.cn/>"]
 homepage = "https://gitee.com/openkylin/x-kernel"
 repository = "https://gitee.com/openkylin/x-kernel"
+documentation = "https://gitee.com/openkylin/x-kernel"
 keywords = ["kylin-x-kernel", "kernel"]
 categories = ["os", "no-std"]
-documentation = "https://gitee.com/openkylin/x-kernel"
 
 [workspace.dependencies]
-# Kernel Modules
-kfeat = { path = "api/kfeat", features = [
-    "alloc-slab",
-    "fp-simd",
-    "fs-ext4",
-    "net",
-    "page-alloc-4g",
-    "rtc",
-    "sched-rr",
-    "task-ext",
-    "uspace",
-] }
-
+# x-kernel Modules
+kfeat = { path = "api/kfeat" }
 kruntime = { path = "init/kruntime" }
 kalloc = { path = "mm/kalloc" }
 fbdevice = { path = "io/fbdevice" }
@@ -66,7 +55,7 @@ osvm = { path = "process/osvm" }
 kplat = { path = "platforms/kplat" }
 kplat-macros = { path = "platforms/kplat-macros" }
 aarch64-qemu-virt = { path = "platforms/aarch64-qemu-virt" }
-x86-pc = { path = "platforms/x86-pc" }
+x86_64-qemu-virt = { path = "platforms/x86_64-qemu-virt" }
 x86-csv = { path = "platforms/x86-csv" }
 riscv64-qemu-virt = { path = "platforms/riscv64-qemu-virt" }
 loongarch64-qemu-virt = { path = "platforms/loongarch64-qemu-virt" }
@@ -125,3 +114,4 @@ platconfig-macros = { path = "util/platconfig-macros" }
 klogger = { path = "util/klogger" }
 backtrace = { path = "util/backtrace" }
 kerrno = { path = "util/kerrno" }
+unittest = { path = "util/unittest" }
