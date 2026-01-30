@@ -7,6 +7,8 @@ mod dma;
 use core::{alloc::Layout, ptr::NonNull};
 
 use alloc_engine::AllocResult;
+// Re-export the interface trait for implementors
+pub use dma::DmaPageTableIf;
 use memaddr::PhysAddr;
 
 use self::dma::ALLOCATOR;

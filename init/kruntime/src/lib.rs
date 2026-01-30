@@ -94,6 +94,19 @@ fn is_init_ok() -> bool {
     INITED_CPUS.load(Ordering::Acquire) == platconfig::plat::CPU_NUM
 }
 
+struct DmaPageTableImpl;
+
+#[crate_interface::impl_interface]
+impl axdma::DmaPageTableIf for DmaPageTableImpl {
+    fn protect(
+        vaddr: memaddr::VirtAddr,
+        size: usize,
+        flags: khal::paging::MappingFlags,
+    ) -> kerrno::KResult {
+        memspace::kernel_layout().lock().protect(vaddr, size, flags)
+    }
+}
+
 /// The main entry point of the runtime.
 ///
 /// It is called from the bootstrapping code in the specific platform crate (see
