@@ -12,3 +12,4 @@ repository.workspace = true
 categories.workspace = true
 
 [dependencies]
+unittest.workspace = true

@@ -15,6 +15,10 @@
 #![no_std]
 #![cfg_attr(feature = "allocator_api", feature(allocator_api))]
 
+#[allow(unused_imports)]
+#[macro_use]
+extern crate alloc;
+
 #[cfg(feature = "bitmap")]
 mod bitmap;
 #[cfg(feature = "bitmap")]

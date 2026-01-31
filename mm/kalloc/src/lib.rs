@@ -501,3 +501,35 @@ pub fn global_add_memory(va: usize, size: usize) -> AllocResult {
     );
     GLOBAL_ALLOCATOR.add_memory(va, size)
 }
+
+#[cfg(unittest)]
+#[allow(missing_docs)]
+pub mod tests_kalloc {
+    use strum::VariantArray;
+    use unittest::def_test;
+
+    use super::{UsageKind, Usages};
+
+    #[def_test]
+    fn test_usages_alloc_dealloc() {
+        let mut usages = Usages::new();
+        usages.alloc(UsageKind::RustHeap, 64);
+        assert_eq!(usages.get(UsageKind::RustHeap), 64);
+        usages.dealloc(UsageKind::RustHeap, 32);
+        assert_eq!(usages.get(UsageKind::RustHeap), 32);
+    }
+
+    #[def_test]
+    fn test_usage_kind_variants_len() {
+        assert!(UsageKind::VARIANTS.len() >= 5);
+    }
+
+    #[def_test]
+    fn test_usages_independent_kinds() {
+        let mut usages = Usages::new();
+        usages.alloc(UsageKind::VirtMem, 10);
+        usages.alloc(UsageKind::PageTable, 20);
+        assert_eq!(usages.get(UsageKind::VirtMem), 10);
+        assert_eq!(usages.get(UsageKind::PageTable), 20);
+    }
+}
