@@ -19,4 +19,5 @@ ktask.workspace = true
 event-listener.workspace = true
 kspin.workspace = true
 lock_api.workspace = true
-khal = { workspace = true, optional = true}
+khal = { workspace = true, optional = true }
+unittest = { workspace = true}

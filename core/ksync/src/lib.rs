@@ -81,6 +81,7 @@ pub use kspin as spin;
 mod mutex;
 mod rwlock;
 mod semaphore;
+mod tests;
 mod util;
 
 #[cfg(feature = "stats")]
