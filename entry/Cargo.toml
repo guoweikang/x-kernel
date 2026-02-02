@@ -20,7 +20,7 @@ kernel = [
     "kfeat/uspace",
 ]
 
-tee = ["kapi/tee", "kcore/tee"]
+tee = ["kapi/tee", "kcore/tee", "kapi/tee_test"]
 smp = ["kfeat/smp"]
 unittest = ["dep:unittest"]
 

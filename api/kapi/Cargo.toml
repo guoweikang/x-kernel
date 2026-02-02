@@ -28,7 +28,7 @@ tee = [
     "dep:hex",
 ]
 tee_test_mock_user_access = []
-tee_test = ["tee", "tee_test_mock_user_access"]
+tee_test = ["tee"]
 
 [dependencies]
 kalloc.workspace = true

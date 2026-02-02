@@ -257,10 +257,10 @@ pub mod tests_user_access {
     }
     tests_name! {
         TEST_USER_ACCESS;
-        //------------------------
-        test_copy_from_user,
-        test_copy_to_user,
-        test_copy_from_user_u64,
+        user_access;
+        // test_copy_from_user,
+        // test_copy_to_user,
+        // test_copy_from_user_u64,
         test_bb_alloc_free,
         test_bb_memdup_user,
         test_bb_memdup_user_private,

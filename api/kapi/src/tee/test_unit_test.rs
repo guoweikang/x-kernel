@@ -8,6 +8,8 @@ use unittest::{
     test_framework::{TestRunner, tests_failed},
 };
 
+#[cfg(feature = "tee_test")]
+use crate::tee::TeeResult;
 use crate::tee::{
     tee_session::tests_tee_session::TEST_TEE_SESSION,
     user_access::tests_user_access::TEST_USER_ACCESS,
@@ -27,4 +29,11 @@ pub fn tee_unit_test() {
     }
 
     warn!("********************************\n");
+}
+
+#[cfg(feature = "tee_test")]
+pub(crate) fn sys_tee_scn_test() -> TeeResult {
+    tee_unit_test();
+
+    Ok(())
 }

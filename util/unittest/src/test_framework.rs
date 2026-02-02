@@ -480,11 +480,12 @@ macro_rules! tests {
 
 #[macro_export]
 macro_rules! tests_name {
-    ($suite_name:ident; $($test_name:ident),* $(,)?) => {
+    ($suite_name:ident; $module_name:ident; $($test_name:ident),* $(,)?) => {
         pub static $suite_name: &[TestDescriptor] = &[
             $(
                 TestDescriptor::new(
                     stringify!($test_name),
+                    stringify!($module_name),
                     $test_name,
                     false, // should_panic
                     false, // ignore

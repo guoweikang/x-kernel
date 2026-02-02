@@ -7,6 +7,8 @@ use khal::uspace::UserContext;
 use linux_sysno::Sysno;
 use tee_raw_sys::{TEE_ERROR_NOT_SUPPORTED, TeeTime};
 
+#[cfg(feature = "tee_test")]
+use crate::tee::test_unit_test::sys_tee_scn_test;
 use crate::tee::{
     tee_cancel::{
         sys_tee_scn_get_cancellation_flag, sys_tee_scn_mask_cancellation,
@@ -95,6 +97,8 @@ pub fn dispatch_irq_tee_syscall(sysno: Sysno, uctx: &mut UserContext) -> TeeResu
             let teetime_ref = unsafe { &*teetime_ptr };
             sys_tee_scn_set_ta_time(teetime_ref)
         }
+        #[cfg(feature = "tee_test")]
+        Sysno::tee_scn_test => sys_tee_scn_test(),
         _ => Err(TEE_ERROR_NOT_SUPPORTED),
     }
 }

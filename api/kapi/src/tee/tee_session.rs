@@ -253,7 +253,7 @@ pub mod tests_tee_session {
     // Test suite definition
     tests_name! {
         TEST_TEE_SESSION;
-        //------------------------
+        tee_session;
         test_tee_ta_ctx,
         test_with_tee_ta_ctx,
     }
