@@ -1,4 +1,3 @@
-Cargo.lock
 /.idea
 .DS_Store
 *.elf
@@ -19,4 +18,5 @@ Cargo.lock
 /.cache/
 /code-stats/
 
-
+# Cargo lock
+Cargo.lock

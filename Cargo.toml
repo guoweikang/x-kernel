@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["entry", "xtask/cargo-platconfig", "xtask/kconfig-gen", "platforms/bootloader"]
+members = [
+    "entry",
+    "xtask/cargo-platconfig",
+    "xtask/kconfig-gen",
+    "platforms/bootloader",
+]
 exclude = []
 
 [workspace.package]
@@ -34,6 +39,7 @@ ktask = { path = "core/ktask" }
 watchdog = { path = "io/watchdog" }
 kcpu = { path = "arch/kcpu" }
 
+
 # x-kernel Crates
 alloc-engine = { path = "mm/alloc-engine" }
 page_table = { path = "mm/page_table" }
@@ -45,12 +51,14 @@ memset = { path = "mm/memset" }
 kspin = { path = "sync/kspin" }
 ktypes = { path = "core/ktypes" }
 
-# x-kenrel userspace Modules
+# x-kernel userspace Modules
 ksignal = { path = "process/ksignal" }
 kcore = { path = "api/kcore" }
 kapi = { path = "api/kapi" }
 kprocess = { path = "process/kprocess" }
 osvm = { path = "process/osvm" }
+kernel-elf-parser = { path = "core/kernel_elf_parser" }
+slab_allocator = { path = "core/slab_allocator" }
 
 # Platform Abstraction Layer
 kplat = { path = "platforms/kplat" }
@@ -67,6 +75,7 @@ aarch64-crosvm-virt = { path = "platforms/aarch64-crosvm-virt" }
 arm-gic = { path = "drivers/arm-gic" }
 rs_fdtree = { path = "drivers/rs-fdtree" }
 linux_sysno = { path = "api/linux_sysno", default-features = false }
+# printf-compat = { path = "util/printf-compat", default-features = false }
 bitflags = "2.10"
 bytemuck = { version = "1.23", features = ["unsound_ptr_pod_impl"] }
 cfg-if = "1.0"
@@ -97,8 +106,10 @@ x86_64 = { version = "0.15.2", features = ["instructions"] }
 
 # Tee Crates
 tee_raw_sys = { path = "tee/tee_raw_sys" }
-mbedtls = { git = "https://gitee.com/openkylin/rust-mbedtls.git", branch = "smx-mbedtls-sys-auto_v2.28.12", default-features = false, features = ["no_std_deps"]}
-dice = { git = "https://gitee.com/openkylin/rust-dice.git", branch = "x-kernel"}
+mbedtls = { git = "https://gitee.com/openkylin/rust-mbedtls.git", branch = "smx-mbedtls-sys-auto_v2.28.12", default-features = false, features = [
+    "no_std_deps",
+] }
+dice = { git = "https://gitee.com/openkylin/rust-dice.git", default-features = false, branch = "x-kernel" }
 
 # Driver Crates
 driver_base = { path = "drivers/driver_base" }
@@ -109,6 +120,9 @@ net = { path = "drivers/net" }
 pci = { path = "drivers/pci" }
 vsock = { path = "drivers/vsock" }
 virtio = { path = "drivers/virtio" }
+aarch64-pmuv3 = { path = "drivers/aarch64-pmuv3" }
+fatfs = { path = "fs/fatfs", default-features = false }
+rsext4 = { path = "fs/rsext4", default-features = false }
 
 # util Crates
 macros = { path = "util/macros" }
@@ -120,3 +134,4 @@ backtrace = { path = "util/backtrace" }
 kerrno = { path = "util/kerrno" }
 unittest = { path = "util/unittest" }
 kconfig-gen = { path = "xtask/kconfig-gen" }
+x-smoltcp = { version = "0.12.0", default-features = false }
