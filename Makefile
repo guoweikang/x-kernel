@@ -67,7 +67,7 @@ ACCEL ?= y
 ICOUNT ?= n
 QEMU_ARGS ?=
 
-DISK_IMG ?= disk.img
+export DISK_IMG ?= $(PWD)/disk.img
 QEMU_LOG ?= n
 NET_DUMP ?= n
 NET_DEV ?= user
@@ -174,11 +174,10 @@ rootfs:
 		curl -f -L $(ROOTFS_URL)/$(ROOTFS_IMG).xz -O; \
 		xz -d $(ROOTFS_IMG).xz; \
 	fi
-	@cp $(ROOTFS_IMG) disk.img
+	@cp $(ROOTFS_IMG) $(DISK_IMG)
 
-img:
-	@echo -e "\033[33mWARN: The 'img' target is deprecated. Please use 'rootfs' instead.\033[0m"
-	@$(MAKE) --no-print-directory rootfs
+teefs:
+	$(MAKE) -C tee_apps ARCH=$(ARCH)
 
 defconfig:
 	$(call defconfig)

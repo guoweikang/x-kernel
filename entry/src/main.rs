@@ -18,6 +18,7 @@ mod unittest_simple;
 #[cfg(not(feature = "unittest"))]
 mod entry;
 
+#[cfg(not(feature = "unittest"))]
 pub const CMDLINE: &[&str] = &["/bin/sh", "-c", include_str!("init.sh")];
 
 #[cfg(not(feature = "unittest"))]

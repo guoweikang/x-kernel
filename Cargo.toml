@@ -3,8 +3,12 @@ resolver = "2"
 members = [
     "entry",
     "xtask/cargo-platconfig",
+    "xtask/crate_rootfs",
     "xtask/kconfig-gen",
     "platforms/bootloader",
+    "tee_apps/sh",
+    "tee_apps/tee_app1",
+    "tee_apps/tee_app2",
 ]
 exclude = []
 
