@@ -33,12 +33,11 @@ impl ConfigWriter {
                                 // Hex: NO quotes, normalize to 0x format
                                 let normalized_hex = if value.starts_with("0x") || value.starts_with("0X") {
                                     format!("0x{}", value[2..].to_lowercase())
+                                } else if let Ok(num) = value.parse::<u64>() {
+                                    format!("0x{:x}", num)
                                 } else {
-                                    match value.parse::<i64>() {
-                                        Ok(num) if num >= 0 => format!("0x{:x}", num),
-                                        Ok(num) => format!("-0x{:x}", num.unsigned_abs()),
-                                        Err(_) => value.to_string(),
-                                    }
+                                    // If parsing fails, use the value as-is
+                                    value.to_string()
                                 };
                                 writeln!(file, "{}={}", clean_name, normalized_hex)?;
                             }

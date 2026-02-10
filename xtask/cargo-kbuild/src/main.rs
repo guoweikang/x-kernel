@@ -346,21 +346,23 @@ fn generate_config_rs(workspace_root: &Path, config: &HashMap<String, String>) -
 
         // Check if it's a hex value (starts with 0x or 0X)
         if value.starts_with("0x") || value.starts_with("0X") {
-            // Parse as u64 hex
-            if u64::from_str_radix(&value[2..], 16).is_ok() {
-                content.push_str(&format!("pub const {}: u64 = {};\n\n", key, value));
-            } else {
-                eprintln!("⚠️  Warning: Invalid hex value for {}: {}", key, value);
+            // Parse and validate as u64 hex
+            match u64::from_str_radix(&value[2..], 16) {
+                Ok(_) => {
+                    content.push_str(&format!("pub const {}: u64 = {};\n\n", key, value));
+                }
+                Err(_) => {
+                    eprintln!("⚠️  Warning: Invalid hex value for {}: {}", key, value);
+                }
             }
         }
-        // Try parsing as signed integer
-        else if value.parse::<i64>().is_ok() {
-            // Use i64 for signed integers
-            content.push_str(&format!("pub const {}: i64 = {};\n\n", key, value));
+        // Try parsing as unsigned integer first
+        else if let Ok(uint_val) = value.parse::<u64>() {
+            content.push_str(&format!("pub const {}: u64 = {};\n\n", key, uint_val));
         }
-        // Try parsing as unsigned integer
-        else if value.parse::<u64>().is_ok() {
-            content.push_str(&format!("pub const {}: u64 = {};\n\n", key, value));
+        // Then try parsing as signed integer
+        else if let Ok(int_val) = value.parse::<i64>() {
+            content.push_str(&format!("pub const {}: i64 = {};\n\n", key, int_val));
         }
         // Otherwise treat as string
         else {
