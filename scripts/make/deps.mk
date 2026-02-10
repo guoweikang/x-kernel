@@ -1,5 +1,11 @@
 # Necessary dependencies for the build system
 
+# Tool to generate platform configuration files
+ifeq ($(shell xconfig --version 2>/dev/null),)
+  $(info Installing xconfig...)
+  $(shell cargo install --path xtask/xconfig)
+endif
+
 # Tool to parse information about the target package
 ifeq ($(shell cargo platconfig --version 2>/dev/null),)
   $(info Installing cargo-platconfig...)
