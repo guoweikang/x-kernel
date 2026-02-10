@@ -12,14 +12,14 @@ cargo install --path .
 
 ## Command Line Interface
 
-The `rkconf` binary provides several commands for working with Kconfig files.
+The `xconf` binary provides several commands for working with Kconfig files.
 
 ### Parse Command
 
 Parse a Kconfig file and display its AST:
 
 ```bash
-rkconf parse --kconfig Kconfig --srctree .
+xconf parse --kconfig Kconfig --srctree .
 ```
 
 Options:
@@ -28,7 +28,7 @@ Options:
 
 Example:
 ```bash
-rkconf parse --kconfig examples/sample_project/Kconfig --srctree examples/sample_project
+xconf parse --kconfig examples/sample_project/Kconfig --srctree examples/sample_project
 ```
 
 ### Defconfig Command
@@ -36,7 +36,7 @@ rkconf parse --kconfig examples/sample_project/Kconfig --srctree examples/sample
 Apply a defconfig file (not yet implemented):
 
 ```bash
-rkconf defconfig <defconfig-path> --kconfig Kconfig --srctree .
+xconf defconfig <defconfig-path> --kconfig Kconfig --srctree .
 ```
 
 ### Menuconfig Command
@@ -44,7 +44,7 @@ rkconf defconfig <defconfig-path> --kconfig Kconfig --srctree .
 Interactive TUI configuration (not yet implemented):
 
 ```bash
-rkconf menuconfig --kconfig Kconfig --srctree .
+xconf menuconfig --kconfig Kconfig --srctree .
 ```
 
 ### Generate Command
@@ -52,7 +52,7 @@ rkconf menuconfig --kconfig Kconfig --srctree .
 Generate configuration files from .config:
 
 ```bash
-rkconf generate --config .config --kconfig Kconfig --srctree .
+xconf generate --config .config --kconfig Kconfig --srctree .
 ```
 
 This command generates:

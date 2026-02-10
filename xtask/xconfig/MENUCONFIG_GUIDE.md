@@ -66,7 +66,7 @@ The TUI (Terminal User Interface) menuconfig provides a modern, user-friendly in
 cd examples/sample_project
 
 # Run menuconfig
-rkconf menuconfig
+xconf menuconfig
 
 # The TUI will launch showing the configuration options
 # Use arrow keys to navigate, Space to toggle, Enter to open menus
