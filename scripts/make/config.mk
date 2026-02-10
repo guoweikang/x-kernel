@@ -5,6 +5,16 @@ config_args := \
   -w 'platform="$(PLAT_NAME)"' \
   -o "$(OUT_CONFIG)"
 
+.PHONY: check-config
+check-config:
+	@if [ ! -f .config ]; then \
+		echo "Error: .config not found."; \
+		echo "Please run one of the following commands first:"; \
+		echo "  xconfig menuconfig"; \
+		echo "  cp defconfig .config"; \
+		exit 1; \
+	fi
+
 ifneq ($(MEM),)
   config_args += -w 'plat.phys-memory-size=$(shell ./scripts/make/strtosz.py $(MEM))'
 else

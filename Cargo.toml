@@ -5,6 +5,11 @@ members = [
     "xtask/cargo-platconfig",
     "xtask/crate_rootfs",
     "xtask/kconfig-gen",
+# build config system
+    "xtask/xconfig",
+    "xtask/cargo-kbuild",
+    "util/kbuild_config",
+
     "platforms/bootloader",
     "tee_apps/sh",
     "tee_apps/tee_app1",
@@ -139,5 +144,7 @@ klogger = { path = "util/klogger" }
 backtrace = { path = "util/backtrace" }
 kerrno = { path = "util/kerrno" }
 unittest = { path = "util/unittest" }
+kbuild-config = { path = "util/kbuild_config" }
+
 kconfig-gen = { path = "xtask/kconfig-gen" }
 smoltcp = { version = "0.12.0", package = "x-smoltcp", default-features = false }

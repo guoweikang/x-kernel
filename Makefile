@@ -90,7 +90,7 @@ endif
 
 .DEFAULT_GOAL := all
 
-ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build disasm run justrun debug defconfig oldconfig),)
+ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build disasm run justrun debug defconfig oldconfig menuconfig),)
 # Install dependencies
 include scripts/make/deps.mk
 # Platform resolving
@@ -168,6 +168,19 @@ endif
 ROOTFS_URL = https://github.com/Starry-OS/rootfs/releases/download/20250917
 ROOTFS_IMG = rootfs-$(ARCH).img
 
+check_config:
+	@if [ ! -f .config ]; then \
+		echo "Error: .config not found."; \
+		echo "Please run one of the following commands first:"; \
+		echo "  make menuconfig"; \
+		echo "  cp defconfig .config"; \
+		exit 1; \
+	fi
+
+
+menuconfig:
+	xconf menuconfig
+
 rootfs:
 	@if [ ! -f $(ROOTFS_IMG) ]; then \
 		echo "Image not found, downloading..."; \
@@ -182,7 +195,7 @@ teefs:
 defconfig:
 	$(call defconfig)
 
-oldconfig:
+oldconfig: check_config
 	$(call oldconfig)
 
 build: $(OUT_DIR) $(FINAL_IMG)
@@ -239,7 +252,7 @@ clean: clean_c
 clean_c::
 	rm -rf $(app-objs)
 
-.PHONY: all defconfig oldconfig \
+.PHONY: all check_config defconfig oldconfig menuconfig \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
 	disk_img clean clean_c

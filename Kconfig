@@ -1,0 +1,7 @@
+mainmenu "X-kernel Configuration"
+
+menu "Platform Selection"
+
+source "platforms/Kconfig"
+
+endmenu
