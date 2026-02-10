@@ -264,7 +264,7 @@ endif
 clean: clean_c
 	rm -rf $(APP)/*.bin $(APP)/*.elf $(OUT_CONFIG)
 	cargo clean
-	@rm -f .config target/kbuild/config.rs .cargo/config.toml
+	@rm -f target/kbuild/config.rs .cargo/config.toml
 
 clean_c::
 	rm -rf $(app-objs)

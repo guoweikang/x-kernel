@@ -1,40 +1,34 @@
 # Extract ARCH and PLAT from .config if it exists
 
 ifneq ($(wildcard .config),)
-  # Extract ARCH based on ARCH_* in .config (checking both with and without CONFIG_ prefix)
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?ARCH_AARCH64=y" .config && echo y),y)
+  # Read .config once and extract ARCH and PLAT in a single pass
+  CONFIG_VALUES := $(shell awk '/^(CONFIG_)?ARCH_[A-Z0-9_]+=y/ { print $$0 } /^(CONFIG_)?PLATFORM_[A-Z0-9_]+=y/ { print $$0 }' .config)
+  
+  # Parse architecture
+  ifeq ($(findstring ARCH_AARCH64=y,$(CONFIG_VALUES)),ARCH_AARCH64=y)
     ARCH_FROM_CONFIG := aarch64
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?ARCH_RISCV64=y" .config && echo y),y)
+  else ifeq ($(findstring ARCH_RISCV64=y,$(CONFIG_VALUES)),ARCH_RISCV64=y)
     ARCH_FROM_CONFIG := riscv64
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?ARCH_X86_64=y" .config && echo y),y)
+  else ifeq ($(findstring ARCH_X86_64=y,$(CONFIG_VALUES)),ARCH_X86_64=y)
     ARCH_FROM_CONFIG := x86_64
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?ARCH_LOONGARCH64=y" .config && echo y),y)
+  else ifeq ($(findstring ARCH_LOONGARCH64=y,$(CONFIG_VALUES)),ARCH_LOONGARCH64=y)
     ARCH_FROM_CONFIG := loongarch64
   endif
   
-  # Extract PLAT based on PLATFORM_* in .config (checking both with and without CONFIG_ prefix)
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_AARCH64_QEMU_VIRT=y" .config && echo y),y)
+  # Parse platform
+  ifeq ($(findstring PLATFORM_AARCH64_QEMU_VIRT=y,$(CONFIG_VALUES)),PLATFORM_AARCH64_QEMU_VIRT=y)
     PLAT_FROM_CONFIG := aarch64-qemu-virt
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_AARCH64_CROSVM_VIRT=y" .config && echo y),y)
+  else ifeq ($(findstring PLATFORM_AARCH64_CROSVM_VIRT=y,$(CONFIG_VALUES)),PLATFORM_AARCH64_CROSVM_VIRT=y)
     PLAT_FROM_CONFIG := aarch64-crosvm-virt
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_AARCH64_RASPI=y" .config && echo y),y)
+  else ifeq ($(findstring PLATFORM_AARCH64_RASPI=y,$(CONFIG_VALUES)),PLATFORM_AARCH64_RASPI=y)
     PLAT_FROM_CONFIG := aarch64-raspi
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_RISCV64_QEMU_VIRT=y" .config && echo y),y)
+  else ifeq ($(findstring PLATFORM_RISCV64_QEMU_VIRT=y,$(CONFIG_VALUES)),PLATFORM_RISCV64_QEMU_VIRT=y)
     PLAT_FROM_CONFIG := riscv64-qemu-virt
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_X86_64_QEMU_VIRT=y" .config && echo y),y)
+  else ifeq ($(findstring PLATFORM_X86_64_QEMU_VIRT=y,$(CONFIG_VALUES)),PLATFORM_X86_64_QEMU_VIRT=y)
     PLAT_FROM_CONFIG := x86_64-qemu-virt
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_X86_CSV=y" .config && echo y),y)
+  else ifeq ($(findstring PLATFORM_X86_CSV=y,$(CONFIG_VALUES)),PLATFORM_X86_CSV=y)
     PLAT_FROM_CONFIG := x86-csv
-  endif
-  ifeq ($(shell grep -q "^\(CONFIG_\)\?PLATFORM_LOONGARCH64_QEMU_VIRT=y" .config && echo y),y)
+  else ifeq ($(findstring PLATFORM_LOONGARCH64_QEMU_VIRT=y,$(CONFIG_VALUES)),PLATFORM_LOONGARCH64_QEMU_VIRT=y)
     PLAT_FROM_CONFIG := loongarch64-qemu-virt
   endif
   

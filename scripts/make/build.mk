@@ -42,11 +42,15 @@ else
   RUSTFLAGS += --check-cfg cfg(unittest)
 endif
 
+# Build requires platform configuration ($(OUT_CONFIG))
+# oldconfig generates .platconfig.toml from platform-specific TOML files
+# This is separate from the xconf Kconfig system (.config)
 _cargo_build: $(OUT_CONFIG)
 	@printf "    $(GREEN_C)Building$(END_C) App: $(APP_NAME), Arch: $(ARCH), Platform: $(PLAT_NAME)\n"
 	$(call cargo_build,$(APP),$(KFEAT) $(APP_FEAT))
 	@cp $(rust_elf) $(OUT_ELF)
 
+# Generate .platconfig.toml if it doesn't exist
 $(OUT_CONFIG):
 	$(call oldconfig)
 
