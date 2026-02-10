@@ -186,6 +186,8 @@ menuconfig:
 	@xconf menuconfig -k Kconfig -s .
 	@if [ -f .config ]; then \
 		echo "✅ Configuration saved to .config"; \
+	else \
+		echo "ℹ️  No changes saved"; \
 	fi
 
 rootfs:
@@ -266,10 +268,14 @@ clean: clean_c
 	cargo clean
 	@rm -f target/kbuild/config.rs .cargo/config.toml
 
+distclean: clean
+	@rm -f .config auto.conf autoconf.h
+	@echo "✅ Removed all configuration files"
+
 clean_c::
 	rm -rf $(app-objs)
 
 .PHONY: all check_config defconfig oldconfig menuconfig saveconfig \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
-	disk_img clean clean_c
+	disk_img clean distclean clean_c
