@@ -16,7 +16,6 @@ impl ConfigWriter {
         writeln!(file, "#")?;
 
         for (name, symbol) in symbols.all_symbols() {
-            // Strip CONFIG_ prefix if present
             let clean_name = name.strip_prefix("CONFIG_").unwrap_or(name);
             
             if let Some(value) = &symbol.value {
@@ -28,7 +27,34 @@ impl ConfigWriter {
                         writeln!(file, "# {} is not set", clean_name)?;
                     }
                     _ => {
-                        writeln!(file, "{}=\"{}\"", clean_name, value)?;
+                        use crate::kconfig::ast::SymbolType;
+                        match symbol.symbol_type {
+                            SymbolType::Hex => {
+                                // Hex: NO quotes, normalize to 0x format
+                                let normalized_hex = if value.starts_with("0x") || value.starts_with("0X") {
+                                    format!("0x{}", value[2..].to_lowercase())
+                                } else {
+                                    match value.parse::<i64>() {
+                                        Ok(num) if num >= 0 => format!("0x{:x}", num),
+                                        Ok(num) => format!("-0x{:x}", num.unsigned_abs()),
+                                        Err(_) => value.to_string(),
+                                    }
+                                };
+                                writeln!(file, "{}={}", clean_name, normalized_hex)?;
+                            }
+                            SymbolType::Int => {
+                                // Int: NO quotes, decimal format
+                                writeln!(file, "{}={}", clean_name, value)?;
+                            }
+                            SymbolType::String => {
+                                // String: Keep quotes
+                                writeln!(file, "{}=\"{}\"", clean_name, value)?;
+                            }
+                            _ => {
+                                // Fallback for other types
+                                writeln!(file, "{}=\"{}\"", clean_name, value)?;
+                            }
+                        }
                     }
                 }
             } else {
