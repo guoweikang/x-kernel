@@ -213,9 +213,6 @@ defconfig:
 	@if [ -f .config.example ]; then \
 		echo "Loading default configuration from .config.example"; \
 		cp .config.example .config; \
-	else \
-		echo "Warning: .config.example not found, using legacy defconfig"; \
-		$(call defconfig); \
 	fi
 
 oldconfig: check_config
