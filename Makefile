@@ -181,6 +181,23 @@ check_config:
 menuconfig:
 	xconf menuconfig
 
+saveconfig:
+	@xconf saveconfig
+
+config: .config
+	@cargo-kbuild generate || echo "cargo-kbuild not available yet"
+
+# Build with new config system (when ready)
+.PHONY: build-kbuild
+build-kbuild: config
+	@cargo-kbuild build || echo "cargo-kbuild not available yet"
+
+.config:
+	@if [ ! -f .config ]; then \
+		echo "No .config found, using default configuration from .config.example"; \
+		cp .config.example .config; \
+	fi
+
 rootfs:
 	@if [ ! -f $(ROOTFS_IMG) ]; then \
 		echo "Image not found, downloading..."; \
@@ -193,7 +210,13 @@ teefs:
 	$(MAKE) -C tee_apps ARCH=$(ARCH)
 
 defconfig:
-	$(call defconfig)
+	@if [ -f .config.example ]; then \
+		echo "Loading default configuration from .config.example"; \
+		cp .config.example .config; \
+	else \
+		echo "Warning: .config.example not found, using legacy defconfig"; \
+		$(call defconfig); \
+	fi
 
 oldconfig: check_config
 	$(call oldconfig)
@@ -252,7 +275,7 @@ clean: clean_c
 clean_c::
 	rm -rf $(app-objs)
 
-.PHONY: all check_config defconfig oldconfig menuconfig \
+.PHONY: all check_config defconfig oldconfig menuconfig saveconfig config build-kbuild \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
 	disk_img clean clean_c

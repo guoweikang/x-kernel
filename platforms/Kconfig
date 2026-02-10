@@ -1,4 +1,7 @@
-menu "Platform Basic Configuration"
+# Platform-specific configuration
+# This file contains hardware platform parameters
+
+menu "Platform Parameters"
 
 config PLATFORM_CPU_NUM
     int "Number of CPUs"
@@ -11,55 +14,56 @@ config PLATFORM_PHYS_MEM_BASE
     hex "Physical memory base address"
     default 0x40000000
     help
-      Base physical address of the system memory.
+      Base physical address of system memory.
 
 config PLATFORM_PHYS_MEM_SIZE
     hex "Physical memory size"
     default 0x08000000
     help
-      Total size of the physical memory.
+      Total size of physical memory (128MB default).
 
 config PLATFORM_KERNEL_BASE_PADDR
     hex "Kernel base physical address"
     default 0x40200000
     help
-      Physical load address of the kernel image.
+      Physical load address of kernel image.
 
 config PLATFORM_KERNEL_BASE_VADDR
     hex "Kernel base virtual address"
     default 0xffff000040200000
     help
-      Virtual address where the kernel is mapped.
+      Virtual address where kernel is mapped.
 
 config PLATFORM_PHYS_VIRT_OFFSET
     hex "Physical to virtual address offset"
     default 0xffff000000000000
     help
-      Offset used to convert physical addresses to virtual addresses.
+      Offset to convert physical addresses to virtual addresses.
 
 config PLATFORM_PHYS_BUS_OFFSET
     hex "Physical to bus address offset"
     default 0x0
     help
       Offset between physical address and bus address.
+      Some boards have different bus and physical addresses.
 
 config PLATFORM_KERNEL_ASPACE_BASE
     hex "Kernel address space base"
     default 0xffff000000000000
     help
-      Base address of the kernel virtual address space.
+      Base address of kernel virtual address space.
 
 config PLATFORM_KERNEL_ASPACE_SIZE
     hex "Kernel address space size"
     default 0x0000fffffffff000
     help
-      Size of the kernel virtual address space.
+      Size of kernel virtual address space.
 
 config PLATFORM_BOOT_STACK_SIZE
     hex "Boot stack size"
     default 0x40000
     help
-      Stack size used during kernel boot.
+      Stack size during kernel boot (256KB).
 
 endmenu
 
@@ -69,27 +73,30 @@ config PLATFORM_DMA_MEM_BASE
     hex "DMA memory base address"
     default 0x40000000
     help
-      Base physical address of DMA memory.
+      Base physical address of DMA-capable memory.
 
 config PLATFORM_DMA_MEM_SIZE
     hex "DMA memory size"
     default 0x00200000
     help
-      Size of the DMA memory region.
+      Size of DMA memory region (2MB).
 
 choice
     prompt "PSCI invocation method"
+    depends on ARCH_AARCH64
     default PLATFORM_PSCI_HVC
 
 config PLATFORM_PSCI_HVC
     bool "HVC (Hypervisor Call)"
     help
-      Use HVC instruction for PSCI calls.
+      Use HVC instruction for PSCI (Power State Coordination Interface) calls.
+      Used when kernel runs in EL1 under a hypervisor.
 
 config PLATFORM_PSCI_SMC
     bool "SMC (Secure Monitor Call)"
     help
       Use SMC instruction for PSCI calls.
+      Used when kernel runs in EL2 or without hypervisor.
 
 endchoice
 
@@ -101,7 +108,7 @@ config PLATFORM_UART_PADDR
     hex "UART physical address"
     default 0x09000000
     help
-      Physical address of the UART controller.
+      Physical address of UART controller.
 
 config PLATFORM_UART_IRQ
     int "UART IRQ number"
@@ -113,16 +120,18 @@ config PLATFORM_TIMER_IRQ
     int "Timer IRQ number"
     default 30
     help
-      Interrupt number for the physical timer.
+      Interrupt number for physical timer.
 
 config PLATFORM_IPI_IRQ
     int "IPI IRQ number"
+    depends on SMP
     default 1
     help
-      Inter-Processor Interrupt number.
+      Inter-Processor Interrupt number for SMP.
 
 config PLATFORM_PMU_IRQ
     int "PMU IRQ number"
+    depends on ARCH_AARCH64
     default 23
     help
       Performance Monitoring Unit interrupt number.
@@ -130,35 +139,37 @@ config PLATFORM_PMU_IRQ
 endmenu
 
 menu "Generic Interrupt Controller (GIC)"
+    depends on ARCH_AARCH64
 
 config PLATFORM_GICD_PADDR
     hex "GIC Distributor base address"
     default 0x08000000
     help
-      Base physical address of the GIC Distributor.
+      Base physical address of GIC Distributor (GICD).
 
 config PLATFORM_GICC_PADDR
     hex "GIC CPU Interface base address"
     default 0x08010000
     help
-      Base physical address of the GIC CPU Interface.
+      Base physical address of GIC CPU Interface (GICC).
 
 endmenu
 
 menu "RTC Configuration"
 
 config PLATFORM_RTC_PL031
-    bool "PL031 RTC"
+    bool "PL031 RTC support"
+    depends on ARCH_AARCH64
     default y
     help
-      Enable PL031 Real-Time Clock support.
+      Enable ARM PL031 Real-Time Clock support.
 
 config PLATFORM_RTC_PADDR
     hex "RTC physical address"
-    default 0x09010000
     depends on PLATFORM_RTC_PL031
+    default 0x09010000
     help
-      Physical address of the PL031 RTC device.
+      Physical address of PL031 RTC device.
 
 endmenu
 

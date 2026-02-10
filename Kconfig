@@ -1,7 +1,379 @@
-mainmenu "X-kernel Configuration"
+mainmenu "X-Kernel Configuration"
 
+#===========================================
+# Architecture Selection
+#===========================================
+menu "Architecture"
+
+choice
+    prompt "Target Architecture"
+    default ARCH_AARCH64
+
+config ARCH_AARCH64
+    bool "ARM 64-bit (AArch64)"
+    help
+      Build for ARM 64-bit architecture (ARMv8-A and later).
+      Supports ARMv8.0 through ARMv8.5+ features.
+
+config ARCH_RISCV64
+    bool "RISC-V 64-bit"
+    help
+      Build for RISC-V 64-bit architecture (RV64GC).
+      Requires hardware with RV64IMAFDC (RV64GC) support.
+
+config ARCH_X86_64
+    bool "x86 64-bit (x86_64)"
+    help
+      Build for x86 64-bit architecture (AMD64/Intel 64).
+      Requires x86-64 compatible processor.
+
+config ARCH_LOONGARCH64
+    bool "LoongArch 64-bit"
+    help
+      Build for LoongArch 64-bit architecture.
+
+endchoice
+
+endmenu
+
+#===========================================
+# Platform Selection
+#===========================================
 menu "Platform Selection"
 
+choice
+    prompt "Target Platform"
+
+config PLAT_QEMU_VIRT_AARCH64
+    bool "QEMU ARM Virt Machine"
+    depends on ARCH_AARCH64
+    help
+      QEMU emulated ARM virtual machine (qemu-system-aarch64 -M virt).
+      This is the default platform for ARM64 development and testing.
+
+config PLAT_QEMU_VIRT_RISCV64
+    bool "QEMU RISC-V Virt Machine"
+    depends on ARCH_RISCV64
+    help
+      QEMU emulated RISC-V virtual machine (qemu-system-riscv64 -M virt).
+
+config PLAT_QEMU_VIRT_X86_64
+    bool "QEMU x86_64 PC"
+    depends on ARCH_X86_64
+    help
+      QEMU emulated x86_64 PC machine.
+
+config PLAT_QEMU_VIRT_LOONGARCH64
+    bool "QEMU LoongArch Virt Machine"
+    depends on ARCH_LOONGARCH64
+    help
+      QEMU emulated LoongArch virtual machine.
+
+config PLAT_CROSVM_VIRT_AARCH64
+    bool "CrosVM ARM Virt Machine"
+    depends on ARCH_AARCH64
+    help
+      CrosVM ARM64 virtual machine for Chrome OS virtualization.
+
+config PLAT_RASPI4
+    bool "Raspberry Pi 4"
+    depends on ARCH_AARCH64
+    help
+      Raspberry Pi 4 Model B single-board computer.
+
+config PLAT_X86_CSV
+    bool "x86 CSV Platform"
+    depends on ARCH_X86_64
+    help
+      x86 CSV (Confidential Computing) platform.
+
+endchoice
+
 source "platforms/Kconfig"
+
+endmenu
+
+#===========================================
+# Kernel Features
+#===========================================
+menu "Kernel Features"
+
+config SMP
+    bool "Symmetric Multi-Processing support"
+    default y
+    help
+      Enable SMP (Symmetric Multi-Processing) support for multi-core systems.
+      This allows the kernel to utilize multiple CPU cores simultaneously.
+
+config NR_CPUS
+    int "Maximum number of CPUs"
+    depends on SMP
+    range 1 256
+    default 4
+    help
+      Maximum number of CPUs the kernel will support.
+
+choice
+    prompt "Preemption Model"
+    default PREEMPT_NONE
+
+config PREEMPT_NONE
+    bool "No Forced Preemption (Server)"
+    help
+      Traditional non-preemptive kernel model.
+      Best for throughput-oriented server workloads.
+
+config PREEMPT_VOLUNTARY
+    bool "Voluntary Kernel Preemption (Desktop)"
+    help
+      Reduce latency by adding preemption points.
+      Good balance for desktop/interactive systems.
+
+config PREEMPT
+    bool "Preemptible Kernel (Low-Latency Desktop)"
+    help
+      Full preemptible kernel for lowest latency.
+      Best for real-time and interactive applications.
+
+endchoice
+
+config HZ
+    int "Timer frequency (HZ)"
+    range 100 1000
+    default 250
+    help
+      Timer interrupt frequency (ticks per second).
+      Higher values improve responsiveness but increase overhead.
+      - 100 HZ: server workloads
+      - 250 HZ: balanced default
+      - 1000 HZ: desktop/interactive
+
+config PANIC_TIMEOUT
+    int "Panic timeout (seconds)"
+    default 0
+    help
+      Seconds to wait before reboot on panic (0 = never reboot).
+
+config CMDLINE
+    string "Built-in kernel command line"
+    default ""
+    help
+      Built-in command line parameters passed to kernel at boot.
+
+config TASK_STACK_SIZE
+    hex "Task stack size"
+    default 0x40000
+    help
+      Stack size for each kernel task (256KB default).
+
+config TICKS_PER_SEC
+    int "Ticks per second"
+    range 50 1000
+    default 100
+    help
+      Number of timer ticks per second for scheduling.
+
+endmenu
+
+#===========================================
+# Memory Management
+#===========================================
+menu "Memory Management"
+
+config MM_PAGE_SIZE
+    hex "Page size"
+    default 0x1000
+    help
+      Page size for memory management (4KB = 0x1000).
+      Must match architecture requirements.
+
+config MM_HEAP_SIZE
+    hex "Kernel heap size"
+    default 0x1000000
+    help
+      Initial kernel heap size (16MB = 0x1000000).
+
+config MM_KALLOC_DEBUG
+    bool "Kernel allocator debugging"
+    depends on DEBUG
+    default n
+    help
+      Enable debug output and checks for kernel memory allocator.
+
+endmenu
+
+#===========================================
+# Device Drivers
+#===========================================
+menu "Device Drivers"
+
+config DRIVER_VIRTIO
+    bool "VirtIO device support"
+    default y
+    help
+      Support for VirtIO paravirtualized devices.
+      Required for QEMU virtual machines.
+
+config DRIVER_VIRTIO_BLK
+    bool "VirtIO block device"
+    depends on DRIVER_VIRTIO
+    default y
+    help
+      VirtIO block device driver for virtual disks.
+
+config DRIVER_VIRTIO_NET
+    bool "VirtIO network device"
+    depends on DRIVER_VIRTIO
+    default y
+    help
+      VirtIO network device driver for virtual NICs.
+
+config DRIVER_ARM_GIC
+    bool "ARM GIC interrupt controller"
+    depends on ARCH_AARCH64
+    default y
+    help
+      ARM Generic Interrupt Controller (GIC) support.
+      Required for ARM64 platforms.
+
+choice
+    prompt "ARM GIC Version"
+    depends on DRIVER_ARM_GIC
+    default DRIVER_ARM_GICV2
+
+config DRIVER_ARM_GICV2
+    bool "GICv2"
+    help
+      ARM Generic Interrupt Controller version 2.
+
+config DRIVER_ARM_GICV3
+    bool "GICv3"
+    help
+      ARM Generic Interrupt Controller version 3.
+
+endchoice
+
+config DRIVER_UART_16550
+    bool "16550 UART support"
+    default n
+    help
+      Support for 16550-compatible UART controllers.
+
+config DRIVER_PL011_UART
+    bool "PL011 UART support"
+    default y
+    help
+      ARM PL011 UART controller support.
+
+endmenu
+
+#===========================================
+# Networking
+#===========================================
+menu "Networking"
+
+config NET
+    bool "Networking support"
+    default y
+    help
+      Enable network stack support.
+
+config NET_MTU
+    int "Network MTU size"
+    depends on NET
+    default 1500
+    range 576 9000
+    help
+      Maximum transmission unit for network packets.
+
+config NET_TCP
+    bool "TCP protocol"
+    depends on NET
+    default y
+    help
+      Enable TCP (Transmission Control Protocol) support.
+
+config NET_UDP
+    bool "UDP protocol"
+    depends on NET
+    default y
+    help
+      Enable UDP (User Datagram Protocol) support.
+
+endmenu
+
+#===========================================
+# File Systems
+#===========================================
+menu "File Systems"
+
+config FS
+    bool "File system support"
+    default y
+    help
+      Enable file system support.
+
+config FS_RAMFS
+    bool "RAM file system"
+    depends on FS
+    default y
+    help
+      In-memory file system.
+
+config FS_DEVFS
+    bool "Device file system"
+    depends on FS
+    default y
+    help
+      Device file system (/dev).
+
+endmenu
+
+#===========================================
+# Debugging and Diagnostics
+#===========================================
+menu "Kernel Hacking"
+
+config DEBUG
+    bool "Kernel debugging"
+    default n
+    help
+      Enable kernel debugging features and additional checks.
+
+config DEBUG_SYMBOLS
+    bool "Include debug symbols"
+    depends on DEBUG
+    default y
+    help
+      Include debug symbols in kernel binary for debugger support.
+
+config LOG_LEVEL
+    int "Default log level (0-7)"
+    range 0 7
+    default 4
+    help
+      Kernel log level (syslog compatible):
+        0 = EMERGENCY - system is unusable
+        1 = ALERT - action must be taken immediately
+        2 = CRITICAL - critical conditions
+        3 = ERROR - error conditions
+        4 = WARNING - warning conditions
+        5 = NOTICE - normal but significant
+        6 = INFO - informational messages
+        7 = DEBUG - debug-level messages
+
+config KALLSYMS
+    bool "Load kernel symbol table"
+    depends on DEBUG
+    default y
+    help
+      Include kernel symbol table for debugging and stack traces.
+
+config VERBOSE
+    bool "Verbose output"
+    depends on DEBUG
+    default n
+    help
+      Enable verbose kernel output during boot and operation.
 
 endmenu
