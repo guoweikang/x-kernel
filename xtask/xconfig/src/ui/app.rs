@@ -163,7 +163,20 @@ impl MenuConfigApp {
             },
             SymbolType::String => ConfigValue::String(value.trim_matches('"').to_string()),
             SymbolType::Int => ConfigValue::Int(value.parse().unwrap_or(0)),
-            SymbolType::Hex => ConfigValue::Hex(value.to_string()),
+            SymbolType::Hex => {
+                let trimmed = value.trim();
+                // If already in hex format, normalize to lowercase
+                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                    ConfigValue::Hex(format!("0x{}", trimmed[2..].to_lowercase()))
+                } else {
+                    // If it's a decimal integer, convert to hex
+                    match trimmed.parse::<i64>() {
+                        Ok(num) if num >= 0 => ConfigValue::Hex(format!("0x{:x}", num)),
+                        Ok(num) => ConfigValue::Hex(format!("-0x{:x}", -num)),
+                        Err(_) => ConfigValue::Hex(trimmed.to_string()), // Keep as-is if invalid
+                    }
+                }
+            }
         }
     }
     
@@ -1691,5 +1704,58 @@ mod tests {
         assert_eq!(MenuConfigApp::validate_hex("0x"), None);
         assert_eq!(MenuConfigApp::validate_hex("0xGG"), None);
         assert_eq!(MenuConfigApp::validate_hex(""), None);
+    }
+
+    #[test]
+    fn test_parse_value_hex() {
+        // Test hex values with 0x prefix (should normalize to lowercase)
+        assert_eq!(
+            MenuConfigApp::parse_value("0x40000000", &SymbolType::Hex),
+            ConfigValue::Hex("0x40000000".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("0xFF", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("0X100", &SymbolType::Hex),
+            ConfigValue::Hex("0x100".to_string())
+        );
+
+        // Test decimal values (should be converted to hex format)
+        assert_eq!(
+            MenuConfigApp::parse_value("1073741824", &SymbolType::Hex),
+            ConfigValue::Hex("0x40000000".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("255", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("0", &SymbolType::Hex),
+            ConfigValue::Hex("0x0".to_string())
+        );
+
+        // Test negative values
+        assert_eq!(
+            MenuConfigApp::parse_value("-255", &SymbolType::Hex),
+            ConfigValue::Hex("-0xff".to_string())
+        );
+
+        // Test with whitespace
+        assert_eq!(
+            MenuConfigApp::parse_value("  0xFF  ", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("  255  ", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+
+        // Test invalid values (should keep as-is)
+        assert_eq!(
+            MenuConfigApp::parse_value("invalid", &SymbolType::Hex),
+            ConfigValue::Hex("invalid".to_string())
+        );
     }
 }
