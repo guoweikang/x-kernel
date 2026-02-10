@@ -25,7 +25,9 @@ ifeq ($(MAKECMDGOALS), doc_check_missing)
 endif
 
 define cargo_build
-  $(call run_cmd,cargo -C $(1) build,$(build_args) --features "$(strip $(2))")
+  $(if $(wildcard .config), \
+    $(call run_cmd,cargo-kbuild -C $(1) build --kconfig .config,$(build_args) --features "$(strip $(2))"), \
+    $(call run_cmd,cargo -C $(1) build,$(build_args) --features "$(strip $(2))"))
 endef
 
 clippy_args := -A unsafe_op_in_unsafe_fn

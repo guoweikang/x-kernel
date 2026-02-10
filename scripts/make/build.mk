@@ -42,7 +42,14 @@ else
   RUSTFLAGS += --check-cfg cfg(unittest)
 endif
 
-_cargo_build: oldconfig
+.config:
+	@echo "$(RED_C)Error$(END_C): .config not found."
+	@echo "Please run one of the following commands first:"
+	@echo "  make menuconfig  - Interactive configuration"
+	@echo "  make defconfig   - Generate default configuration"
+	@exit 1
+
+_cargo_build: .config
 	@printf "    $(GREEN_C)Building$(END_C) App: $(APP_NAME), Arch: $(ARCH), Platform: $(PLAT_NAME)\n"
 	$(call cargo_build,$(APP),$(KFEAT) $(APP_FEAT))
 	@cp $(rust_elf) $(OUT_ELF)
