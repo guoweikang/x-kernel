@@ -166,13 +166,17 @@ impl MenuConfigApp {
             SymbolType::Hex => {
                 let trimmed = value.trim();
                 // If already in hex format, normalize to lowercase
-                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                    ConfigValue::Hex(format!("0x{}", trimmed[2..].to_lowercase()))
+                if let Some(hex_part) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+                    ConfigValue::Hex(format!("0x{}", hex_part.to_lowercase()))
                 } else {
                     // If it's a decimal integer, convert to hex
                     match trimmed.parse::<i64>() {
                         Ok(num) if num >= 0 => ConfigValue::Hex(format!("0x{:x}", num)),
-                        Ok(num) => ConfigValue::Hex(format!("-0x{:x}", -num)),
+                        Ok(num) => {
+                            // Use unsigned_abs to avoid overflow for i64::MIN
+                            let abs_val = num.unsigned_abs();
+                            ConfigValue::Hex(format!("-0x{:x}", abs_val))
+                        }
                         Err(_) => ConfigValue::Hex(trimmed.to_string()), // Keep as-is if invalid
                     }
                 }
@@ -1750,6 +1754,18 @@ mod tests {
         assert_eq!(
             MenuConfigApp::parse_value("  255  ", &SymbolType::Hex),
             ConfigValue::Hex("0xff".to_string())
+        );
+
+        // Test edge cases
+        // Empty hex prefix (0x with no digits) - should be kept as-is
+        assert_eq!(
+            MenuConfigApp::parse_value("0x", &SymbolType::Hex),
+            ConfigValue::Hex("0x".to_string())
+        );
+        // i64::MIN overflow case
+        assert_eq!(
+            MenuConfigApp::parse_value("-9223372036854775808", &SymbolType::Hex),
+            ConfigValue::Hex("-0x8000000000000000".to_string())
         );
 
         // Test invalid values (should keep as-is)
