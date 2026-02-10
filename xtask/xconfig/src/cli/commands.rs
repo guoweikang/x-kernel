@@ -5,7 +5,7 @@ use clap::{Parser as ClapParser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(ClapParser, Debug)]
-#[command(name = "rkconf")]
+#[command(name = "xconf")]
 #[command(about = "Rust Kconfig tool - Kbuild configuration system", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
