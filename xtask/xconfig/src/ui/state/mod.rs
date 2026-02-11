@@ -209,6 +209,12 @@ impl ConfigState {
         self.all_items.extend(items);
     }
     
+    /// Recursively collects menu items from entries and appends them to the provided items vector.
+    /// 
+    /// This helper function is used to handle inline processing of `if` blocks, ensuring that
+    /// entries within if blocks are collected into the same items vector as their siblings.
+    /// This prevents menu tree overwrites that would occur if if-blocks were processed via
+    /// separate calls to `process_entries()`.
     fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>) {
         for entry in entries {
             match entry {

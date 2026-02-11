@@ -75,15 +75,13 @@ endmenu
     assert!(all_item_ids.contains(&"menu_Platform Selection".to_string()), "Should contain Platform Selection menu");
     
     // CRITICAL: Should contain the platform choice that's inside the if block
-    assert!(all_item_ids.contains(&"choice".to_string()) || 
-            all_item_ids.iter().any(|id| id.contains("Platform")), 
-            "Should contain platform choice from if block");
-    
-    // Should contain platform configs from inside if blocks
+    // We check for the specific platform configs which are unique to the if block
     assert!(all_item_ids.contains(&"PLATFORM_QEMU".to_string()), 
             "Should contain PLATFORM_QEMU from inside if ARCH_AARCH64 block");
     assert!(all_item_ids.contains(&"PLATFORM_CROSVM".to_string()), 
             "Should contain PLATFORM_CROSVM from inside if ARCH_AARCH64 block");
+    
+    // Should contain platform configs from inside other if blocks
     assert!(all_item_ids.contains(&"PLATFORM_RISCV_QEMU".to_string()), 
             "Should contain PLATFORM_RISCV_QEMU from inside if ARCH_RISCV64 block");
     
@@ -94,12 +92,15 @@ endmenu
     let platform_items = platform_menu_items.unwrap();
     let platform_item_ids: Vec<String> = platform_items.iter().map(|i| i.id.clone()).collect();
     
-    // The menu should contain the choice from the if block (or its options)
-    let has_platform_choice = platform_item_ids.iter().any(|id| 
-        id.contains("Platform") || id == "PLATFORM_QEMU" || id.starts_with("choice")
-    );
-    assert!(has_platform_choice, 
-            "Platform Selection menu should contain items from if blocks. Found: {:?}", 
+    // The menu should contain the platform-specific configs from inside the if blocks
+    assert!(platform_item_ids.contains(&"PLATFORM_QEMU".to_string()), 
+            "Platform Selection menu should contain PLATFORM_QEMU from if ARCH_AARCH64 block. Found: {:?}", 
+            platform_item_ids);
+    assert!(platform_item_ids.contains(&"PLATFORM_CROSVM".to_string()), 
+            "Platform Selection menu should contain PLATFORM_CROSVM from if ARCH_AARCH64 block. Found: {:?}", 
+            platform_item_ids);
+    assert!(platform_item_ids.contains(&"PLATFORM_RISCV_QEMU".to_string()), 
+            "Platform Selection menu should contain PLATFORM_RISCV_QEMU from if ARCH_RISCV64 block. Found: {:?}", 
             platform_item_ids);
 }
 
