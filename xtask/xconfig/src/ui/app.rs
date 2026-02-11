@@ -1161,7 +1161,10 @@ impl MenuConfigApp {
         Ok(())
     }
     
-    /// Get all option IDs belonging to a choice
+    /// Get all option IDs belonging to a choice.
+    /// 
+    /// Returns a vector of config option IDs that are children of the specified choice.
+    /// Used by `handle_choice_selection` to implement mutual exclusion.
     fn get_choice_options(&self, choice_id: &str) -> Vec<String> {
         self.config_state
             .all_items
@@ -1173,7 +1176,20 @@ impl MenuConfigApp {
             .collect()
     }
     
-    /// Handle choice selection with mutual exclusion
+    /// Handle choice selection with mutual exclusion.
+    /// 
+    /// This method enforces Kconfig's choice mutual exclusion semantics:
+    /// when a user selects one option in a choice, all other options are automatically deselected.
+    /// 
+    /// # Arguments
+    /// * `choice_id` - The ID of the parent choice
+    /// * `selected_option` - The ID of the option being selected
+    /// 
+    /// # Behavior
+    /// 1. Gets all options belonging to the choice
+    /// 2. Disables all options except the selected one (mutual exclusion)
+    /// 3. Enables the selected option
+    /// 4. Updates UI state to reflect changes
     fn handle_choice_selection(&mut self, choice_id: &str, selected_option: &str) -> Result<()> {
         // 1. Get all options in this choice
         let choice_options = self.get_choice_options(choice_id);
