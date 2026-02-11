@@ -35,6 +35,10 @@
 # Enable unstable features
 export RUSTC_BOOTSTRAP := 1
 export DWARF := y
+
+# Include Kconfig extraction (must be before ARCH/PLAT defaults)
+-include scripts/make/kconfig.mk
+
 # General options
 ARCH ?= aarch64
 PLAT ?= $(ARCH)-qemu-virt
@@ -179,7 +183,12 @@ check_config:
 
 
 menuconfig:
-	xconf menuconfig
+	@xconf menuconfig -k Kconfig -s .
+	@if [ -f .config ]; then \
+		echo "✅ Configuration saved to .config"; \
+	else \
+		echo "ℹ️  No changes saved"; \
+	fi
 
 rootfs:
 	@if [ ! -f $(ROOTFS_IMG) ]; then \
@@ -193,10 +202,19 @@ teefs:
 	$(MAKE) -C tee_apps ARCH=$(ARCH)
 
 defconfig:
-	$(call defconfig)
+	@xconf saveconfig -o .config -k Kconfig -s .
+	@echo "✅ Default configuration saved to .config"
 
-oldconfig: check_config
-	$(call oldconfig)
+saveconfig:
+	@xconf saveconfig -o .config -k Kconfig -s .
+
+oldconfig:
+	@if [ ! -f .config ]; then \
+		echo "$(RED_C)Error$(END_C): .config not found."; \
+		echo "Please run 'make defconfig' or 'make menuconfig' first."; \
+		exit 1; \
+	fi
+	@xconf oldconfig -c .config -k Kconfig -s .
 
 build: $(OUT_DIR) $(FINAL_IMG)
 
@@ -248,11 +266,16 @@ endif
 clean: clean_c
 	rm -rf $(APP)/*.bin $(APP)/*.elf $(OUT_CONFIG)
 	cargo clean
+	@rm -f target/kbuild/config.rs .cargo/config.toml
+
+distclean: clean
+	@rm -f .config auto.conf autoconf.h
+	@echo "✅ Removed all configuration files"
 
 clean_c::
 	rm -rf $(app-objs)
 
-.PHONY: all check_config defconfig oldconfig menuconfig \
+.PHONY: all check_config defconfig oldconfig menuconfig saveconfig \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
-	disk_img clean clean_c
+	disk_img clean distclean clean_c

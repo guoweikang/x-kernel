@@ -1,7 +1,114 @@
 mainmenu "X-kernel Configuration"
 
+choice
+    prompt "Target Architecture"
+    default ARCH_AARCH64
+
+config ARCH_AARCH64
+    bool "AArch64 (ARM 64-bit)"
+
+config ARCH_RISCV64
+    bool "RISC-V 64-bit"
+
+config ARCH_X86_64
+    bool "x86_64"
+
+config ARCH_LOONGARCH64
+    bool "LoongArch 64-bit"
+
+endchoice
+
 menu "Platform Selection"
 
+if ARCH_AARCH64
+
+choice
+    prompt "AArch64 Platform"
+    default PLATFORM_AARCH64_QEMU_VIRT
+
+config PLATFORM_AARCH64_QEMU_VIRT
+    bool "QEMU ARM64 Virtual Machine"
+
+config PLATFORM_AARCH64_CROSVM_VIRT
+    bool "CROSVM ARM64 Virtual Machine"
+
+config PLATFORM_AARCH64_RASPI
+    bool "Raspberry Pi 4B"
+
+endchoice
+
+endif # ARCH_AARCH64
+
+if ARCH_RISCV64
+
+choice
+    prompt "RISC-V 64 Platform"
+    default PLATFORM_RISCV64_QEMU_VIRT
+
+config PLATFORM_RISCV64_QEMU_VIRT
+    bool "QEMU RISC-V 64 Virtual Machine"
+
+endchoice
+
+endif # ARCH_RISCV64
+
+if ARCH_X86_64
+
+choice
+    prompt "x86_64 Platform"
+    default PLATFORM_X86_64_QEMU_VIRT
+
+config PLATFORM_X86_64_QEMU_VIRT
+    bool "QEMU x86_64 Virtual Machine"
+
+config PLATFORM_X86_CSV
+    bool "x86 CSV Platform"
+
+endchoice
+
+endif # ARCH_X86_64
+
+if ARCH_LOONGARCH64
+
+choice
+    prompt "LoongArch64 Platform"
+    default PLATFORM_LOONGARCH64_QEMU_VIRT
+
+config PLATFORM_LOONGARCH64_QEMU_VIRT
+    bool "QEMU LoongArch64 Virtual Machine"
+
+endchoice
+
+endif # ARCH_LOONGARCH64
+
 source "platforms/Kconfig"
+
+endmenu
+
+menu "Kernel Features"
+
+config FEAT_SMP
+    bool "Symmetric Multiprocessing (SMP)"
+    default y
+
+config FEAT_FP_SIMD
+    bool "Floating Point and SIMD"
+    default y
+
+config FEAT_NET
+    bool "Network Stack"
+    default y
+
+config FEAT_FS
+    bool "File System Support"
+    default y
+
+config FEAT_ALLOC
+    bool "Dynamic Memory Allocation"
+    default y
+
+config FEAT_IRQ
+    bool "Interrupt Support"
+    default y
 
 endmenu
