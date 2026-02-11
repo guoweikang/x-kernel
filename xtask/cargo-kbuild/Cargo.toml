@@ -1,0 +1,21 @@
+[package]
+name = "cargo-kbuild"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Cargo plugin for kbuild"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+keywords = ["cargo", "kbuild", "build-system"]
+categories = ["development-tools::build-utils"]
+
+[[bin]]
+name = "cargo-kbuild"
+path = "src/main.rs"
+
+[dependencies]
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
