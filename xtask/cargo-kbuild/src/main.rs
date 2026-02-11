@@ -8,7 +8,7 @@ use std::process::{self, Command};
 #[command(name = "cargo-kbuild", bin_name = "cargo")]
 #[command(about = "Build with Kconfig features from .config")]
 struct Cli {
-    /// Subcommand name (always "kbuild")
+    /// Subcommand name (always "kbuild") - required for cargo subcommand compatibility
     #[arg(value_name = "kbuild")]
     _subcommand: String,
     
@@ -66,12 +66,23 @@ fn main() {
     }
     
     // Execute cargo build
-    let status = cmd.status()
-        .expect("Failed to execute cargo build");
+    let status = match cmd.status() {
+        Ok(status) => status,
+        Err(e) => {
+            eprintln!("Failed to execute cargo build: {}", e);
+            process::exit(1);
+        }
+    };
     
     process::exit(status.code().unwrap_or(1));
 }
 
+/// Parse .config file and extract enabled features
+/// 
+/// Handles Kconfig format with optional CONFIG_ prefix:
+/// - CONFIG_XXX=y or CONFIG_XXX=m → feature "xxx"
+/// - XXX=y or XXX=m → feature "xxx" (for compatibility)
+/// - Ignores comments, empty lines, and disabled options (=n)
 fn parse_kconfig(path: &PathBuf) -> Result<Vec<String>, String> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("Failed to read file: {}", e))?;
