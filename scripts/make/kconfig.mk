@@ -2,9 +2,11 @@
 # BUT: Skip for Kconfig configuration targets (menuconfig, defconfig, etc.)
 
 # Define targets that DON'T need .config
+# Note: These lists are duplicated in the main Makefile for early validation
+# Keep both lists in sync when adding new targets
 KCONFIG_TARGETS := menuconfig defconfig saveconfig oldconfig
 CLEAN_TARGETS := clean clean_c distclean
-UTILITY_TARGETS := help doc doc_check_missing
+UTILITY_TARGETS := clippy doc doc_check_missing fmt unittest unittest_no_fail_fast
 
 # Check if current goal is a non-build target
 SKIP_CONFIG_CHECK := $(filter $(KCONFIG_TARGETS) $(CLEAN_TARGETS) $(UTILITY_TARGETS),$(MAKECMDGOALS))

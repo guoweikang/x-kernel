@@ -95,6 +95,8 @@ endif
 .DEFAULT_GOAL := all
 
 # Early validation: Check if .config exists for build targets
+# Note: These target lists are also defined in scripts/make/kconfig.mk
+# They must be defined here (before including kconfig.mk) to validate .config early
 BUILD_TARGETS := all build run justrun debug disasm
 KCONFIG_TARGETS := menuconfig defconfig saveconfig oldconfig
 CLEAN_TARGETS := clean clean_c distclean
