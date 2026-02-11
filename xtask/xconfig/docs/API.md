@@ -377,10 +377,10 @@ Error type for Kconfig operations.
 
 ### Running Commands
 
-The CLI is accessed through the `rkconf` binary:
+The CLI is accessed through the `xconf` binary:
 
 ```bash
-rkconf <command> [options]
+xconf <command> [options]
 ```
 
 Available commands:

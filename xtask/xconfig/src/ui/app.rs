@@ -163,7 +163,24 @@ impl MenuConfigApp {
             },
             SymbolType::String => ConfigValue::String(value.trim_matches('"').to_string()),
             SymbolType::Int => ConfigValue::Int(value.parse().unwrap_or(0)),
-            SymbolType::Hex => ConfigValue::Hex(value.to_string()),
+            SymbolType::Hex => {
+                let trimmed = value.trim();
+                // If already in hex format, normalize to lowercase
+                if let Some(hex_part) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+                    ConfigValue::Hex(format!("0x{}", hex_part.to_lowercase()))
+                } else {
+                    // If it's a decimal integer, convert to hex
+                    match trimmed.parse::<i64>() {
+                        Ok(num) if num >= 0 => ConfigValue::Hex(format!("0x{:x}", num)),
+                        Ok(num) => {
+                            // Use unsigned_abs to avoid overflow for i64::MIN
+                            let abs_val = num.unsigned_abs();
+                            ConfigValue::Hex(format!("-0x{:x}", abs_val))
+                        }
+                        Err(_) => ConfigValue::Hex(trimmed.to_string()), // Keep as-is if invalid
+                    }
+                }
+            }
         }
     }
     
@@ -1003,6 +1020,11 @@ impl MenuConfigApp {
         let item = &items[self.navigation.selected_index];
         let item_id = item.id.clone();
         
+        // Check if this is a choice option
+        if let Some(parent_choice_id) = &item.parent_choice {
+            return self.handle_choice_selection(parent_choice_id, &item_id);
+        }
+        
         // Check if this is a string/int/hex config item that needs editing
         if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
             match symbol_type {
@@ -1135,6 +1157,65 @@ impl MenuConfigApp {
             self.sync_ui_state_from_symbol_table()?;
             self.update_enabled_states()?;
         }
+        
+        Ok(())
+    }
+    
+    /// Get all option IDs belonging to a choice.
+    /// 
+    /// Returns a vector of config option IDs that are children of the specified choice.
+    /// Used by `handle_choice_selection` to implement mutual exclusion.
+    fn get_choice_options(&self, choice_id: &str) -> Vec<String> {
+        self.config_state
+            .all_items
+            .iter()
+            .filter(|item| {
+                item.parent_choice.as_ref().map(|pc| pc == choice_id).unwrap_or(false)
+            })
+            .map(|item| item.id.clone())
+            .collect()
+    }
+    
+    /// Handle choice selection with mutual exclusion.
+    /// 
+    /// This method enforces Kconfig's choice mutual exclusion semantics:
+    /// when a user selects one option in a choice, all other options are automatically deselected.
+    /// 
+    /// # Arguments
+    /// * `choice_id` - The ID of the parent choice
+    /// * `selected_option` - The ID of the option being selected
+    /// 
+    /// # Behavior
+    /// 1. Gets all options belonging to the choice
+    /// 2. Disables all options except the selected one (mutual exclusion)
+    /// 3. Enables the selected option
+    /// 4. Updates UI state to reflect changes
+    fn handle_choice_selection(&mut self, choice_id: &str, selected_option: &str) -> Result<()> {
+        // 1. Get all options in this choice
+        let choice_options = self.get_choice_options(choice_id);
+        
+        // 2. Disable all other options (mutual exclusion)
+        for option_id in &choice_options {
+            if option_id != selected_option {
+                self.apply_value_change(
+                    option_id,
+                    ConfigValue::Bool(false)
+                )?;
+            }
+        }
+        
+        // 3. Enable the selected option
+        self.apply_value_change(
+            selected_option,
+            ConfigValue::Bool(true)
+        )?;
+        
+        // 4. Update UI state
+        self.sync_ui_state_from_symbol_table()?;
+        self.update_enabled_states()?;
+        
+        // 5. Show status message
+        self.status_message = Some(format!(" {} selected", selected_option));
         
         Ok(())
     }
@@ -1691,5 +1772,70 @@ mod tests {
         assert_eq!(MenuConfigApp::validate_hex("0x"), None);
         assert_eq!(MenuConfigApp::validate_hex("0xGG"), None);
         assert_eq!(MenuConfigApp::validate_hex(""), None);
+    }
+
+    #[test]
+    fn test_parse_value_hex() {
+        // Test hex values with 0x prefix (should normalize to lowercase)
+        assert_eq!(
+            MenuConfigApp::parse_value("0x40000000", &SymbolType::Hex),
+            ConfigValue::Hex("0x40000000".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("0xFF", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("0X100", &SymbolType::Hex),
+            ConfigValue::Hex("0x100".to_string())
+        );
+
+        // Test decimal values (should be converted to hex format)
+        assert_eq!(
+            MenuConfigApp::parse_value("1073741824", &SymbolType::Hex),
+            ConfigValue::Hex("0x40000000".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("255", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("0", &SymbolType::Hex),
+            ConfigValue::Hex("0x0".to_string())
+        );
+
+        // Test negative values
+        assert_eq!(
+            MenuConfigApp::parse_value("-255", &SymbolType::Hex),
+            ConfigValue::Hex("-0xff".to_string())
+        );
+
+        // Test with whitespace
+        assert_eq!(
+            MenuConfigApp::parse_value("  0xFF  ", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::parse_value("  255  ", &SymbolType::Hex),
+            ConfigValue::Hex("0xff".to_string())
+        );
+
+        // Test edge cases
+        // Empty hex prefix (0x with no digits) - should be kept as-is
+        assert_eq!(
+            MenuConfigApp::parse_value("0x", &SymbolType::Hex),
+            ConfigValue::Hex("0x".to_string())
+        );
+        // i64::MIN overflow case
+        assert_eq!(
+            MenuConfigApp::parse_value("-9223372036854775808", &SymbolType::Hex),
+            ConfigValue::Hex("-0x8000000000000000".to_string())
+        );
+
+        // Test invalid values (should keep as-is)
+        assert_eq!(
+            MenuConfigApp::parse_value("invalid", &SymbolType::Hex),
+            ConfigValue::Hex("invalid".to_string())
+        );
     }
 }

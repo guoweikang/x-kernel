@@ -88,7 +88,7 @@ EOF
 **Step 2: Generate configuration with defaults**
 
 ```bash
-rkconf saveconfig
+xconf saveconfig
 # Creates .config, auto.conf, and autoconf.h
 ```
 
@@ -106,7 +106,7 @@ cat .config
 
 ```bash
 # You added new options to Kconfig...
-rkconf oldconfig
+xconf oldconfig
 
 # Output:
 # 🆕 New configuration options detected:
@@ -117,7 +117,7 @@ rkconf oldconfig
 
 With auto-defaults:
 ```bash
-rkconf oldconfig --auto-defaults
+xconf oldconfig --auto-defaults
 # Automatically applies default values to new options
 ```
 
@@ -132,7 +132,7 @@ use std::fs;
 fn main() {
     // Read the generated configuration
     let config = fs::read_to_string(".config")
-        .expect("Run 'rkconf saveconfig' first");
+        .expect("Run 'xconf saveconfig' first");
 
     for line in config.lines() {
         let line = line.trim();
@@ -198,11 +198,11 @@ fn main() {
 
 ## 📚 Commands Reference
 
-### `rkconf saveconfig`
+### `xconf saveconfig`
 Generate configuration files with default values from Kconfig.
 
 ```bash
-rkconf saveconfig [OPTIONS]
+xconf saveconfig [OPTIONS]
 
 Options:
   -o, --output <FILE>    Output .config path [default: .config]
@@ -212,14 +212,14 @@ Options:
 
 **Example:**
 ```bash
-rkconf saveconfig --output my.config --kconfig MyKconfig
+xconf saveconfig --output my.config --kconfig MyKconfig
 ```
 
-### `rkconf oldconfig`
+### `xconf oldconfig`
 Update existing configuration when Kconfig changes.
 
 ```bash
-rkconf oldconfig [OPTIONS]
+xconf oldconfig [OPTIONS]
 
 Options:
   -c, --config <FILE>      Input .config file [default: .config]
@@ -237,17 +237,17 @@ Options:
 **Example:**
 ```bash
 # Interactive mode (prompts for new options)
-rkconf oldconfig
+xconf oldconfig
 
 # Automatic mode (uses defaults for new options)
-rkconf oldconfig --auto-defaults
+xconf oldconfig --auto-defaults
 ```
 
-### `rkconf generate`
+### `xconf generate`
 Generate auto.conf and autoconf.h from existing .config.
 
 ```bash
-rkconf generate [OPTIONS]
+xconf generate [OPTIONS]
 
 Options:
   -c, --config <FILE>    Input .config file [default: .config]
@@ -257,14 +257,14 @@ Options:
 
 **Example:**
 ```bash
-rkconf generate --config production.config
+xconf generate --config production.config
 ```
 
-### `rkconf parse`
+### `xconf parse`
 Parse and validate Kconfig syntax (debugging tool).
 
 ```bash
-rkconf parse [OPTIONS]
+xconf parse [OPTIONS]
 
 Options:
   -k, --kconfig <FILE>   Kconfig file path [default: Kconfig]
@@ -273,14 +273,14 @@ Options:
 
 **Example:**
 ```bash
-rkconf parse --kconfig Kconfig
+xconf parse --kconfig Kconfig
 ```
 
-### `rkconf menuconfig`
+### `xconf menuconfig`
 Interactive terminal UI for configuration.
 
 ```bash
-rkconf menuconfig [OPTIONS]
+xconf menuconfig [OPTIONS]
 
 Options:
   -k, --kconfig <FILE>   Kconfig file path [default: Kconfig]
@@ -298,11 +298,11 @@ Options:
 
 See [MENUCONFIG_GUIDE.md](MENUCONFIG_GUIDE.md) for detailed usage.
 
-### `rkconf defconfig` *(Coming Soon)*
+### `xconf defconfig` *(Coming Soon)*
 Apply a defconfig file.
 
 ```bash
-rkconf defconfig <DEFCONFIG_FILE> [OPTIONS]
+xconf defconfig <DEFCONFIG_FILE> [OPTIONS]
 
 Options:
   -k, --kconfig <FILE>   Kconfig file path [default: Kconfig]
@@ -367,7 +367,7 @@ examples/sample_project/
 **Try it:**
 ```bash
 cd examples/sample_project
-rkconf saveconfig
+xconf saveconfig
 cat .config
 ```
 

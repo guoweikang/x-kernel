@@ -18,6 +18,7 @@ pub struct MenuItem {
     pub implies: Vec<String>,
     pub selected_by: Vec<String>,
     pub implied_by: Vec<String>,
+    pub parent_choice: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,7 @@ impl MenuItem {
             implies: config.properties.imply.iter().map(|(s, _)| s.clone()).collect(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -85,6 +87,7 @@ impl MenuItem {
             implies: config.properties.imply.iter().map(|(s, _)| s.clone()).collect(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -106,6 +109,7 @@ impl MenuItem {
             implies: Vec::new(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -128,6 +132,7 @@ impl MenuItem {
             implies: Vec::new(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -149,6 +154,7 @@ impl MenuItem {
             implies: Vec::new(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
 }
@@ -202,6 +208,20 @@ impl ConfigState {
     fn process_entries(&mut self, entries: &[Entry], depth: usize, parent_id: &str) {
         let mut items = Vec::new();
         
+        // Process entries and collect them into items
+        self.collect_items(entries, depth, parent_id, &mut items);
+        
+        self.menu_tree.insert(parent_id.to_string(), items.clone());
+        self.all_items.extend(items);
+    }
+    
+    /// Recursively collects menu items from entries and appends them to the provided items vector.
+    /// 
+    /// This helper function is used to handle inline processing of `if` blocks, ensuring that
+    /// entries within if blocks are collected into the same items vector as their siblings.
+    /// This prevents menu tree overwrites that would occur if if-blocks were processed via
+    /// separate calls to `process_entries()`.
+    fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>) {
         for entry in entries {
             match entry {
                 Entry::Config(config) => {
@@ -220,16 +240,30 @@ impl ConfigState {
                     let menu_id = item.id.clone();
                     items.push(item);
                     
-                    // Process menu children
+                    // Process menu children with new parent_id and depth
                     self.process_entries(&menu.entries, depth + 1, &menu_id);
                 }
                 Entry::Choice(choice) => {
-                    let item = MenuItem::from_choice(choice, depth);
+                    // Generate unique choice ID if not named
+                    let choice_id = if let Some(name) = &choice.name {
+                        name.clone()
+                    } else {
+                        // Use the first option name to generate a unique ID
+                        if let Some(first_option) = choice.options.first() {
+                            format!("choice_{}", first_option.name)
+                        } else {
+                            "choice_unknown".to_string()
+                        }
+                    };
+                    
+                    let mut item = MenuItem::from_choice(choice, depth);
+                    item.id = choice_id.clone();
                     items.push(item);
                     
-                    // Add choice options as children
+                    // Add choice options as children with parent_choice set
                     for option in &choice.options {
-                        let opt_item = MenuItem::from_config(option, depth + 1);
+                        let mut opt_item = MenuItem::from_config(option, depth + 1);
+                        opt_item.parent_choice = Some(choice_id.clone());
                         items.push(opt_item);
                     }
                 }
@@ -238,8 +272,9 @@ impl ConfigState {
                     items.push(item);
                 }
                 Entry::If(if_entry) => {
-                    // Process if block entries
-                    self.process_entries(&if_entry.entries, depth, parent_id);
+                    // Process if block entries inline - they belong to the same menu level
+                    // The if condition is already part of each entry's depends_on field
+                    self.collect_items(&if_entry.entries, depth, parent_id, items);
                 }
                 Entry::MainMenu(_title) => {
                     // Skip mainmenu for now
@@ -249,9 +284,6 @@ impl ConfigState {
                 }
             }
         }
-        
-        self.menu_tree.insert(parent_id.to_string(), items.clone());
-        self.all_items.extend(items);
     }
     
     pub fn get_items_for_path(&self, path: &[String]) -> Vec<MenuItem> {
