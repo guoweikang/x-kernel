@@ -1,0 +1,33 @@
+mainmenu "Test Config"
+
+choice
+    prompt "Target Architecture"
+    default ARCH_AARCH64
+
+config ARCH_AARCH64
+    bool "AArch64"
+
+config ARCH_RISCV64
+    bool "RISC-V 64-bit"
+
+endchoice
+
+menu "Platform Selection"
+
+if ARCH_AARCH64
+
+choice
+    prompt "AArch64 Platform"
+    default PLATFORM_QEMU
+
+config PLATFORM_QEMU
+    bool "QEMU virt machine"
+
+config PLATFORM_CROSVM
+    bool "Crosvm virt machine"
+
+endchoice
+
+endif
+
+endmenu
