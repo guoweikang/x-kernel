@@ -31,12 +31,10 @@ pub mod plat {
 
     // PSCI method (conditional compilation based on Kconfig)
     #[cfg(CONFIG_PLATFORM_PSCI_HVC)]
-    pub const PSCI_METHOD: aarch64_peripherals::psci::PsciMethod =
-        aarch64_peripherals::psci::PsciMethod::Hvc;
+    pub const PSCI_METHOD: &str = "hvc";
 
     #[cfg(CONFIG_PLATFORM_PSCI_SMC)]
-    pub const PSCI_METHOD: aarch64_peripherals::psci::PsciMethod =
-        aarch64_peripherals::psci::PsciMethod::Smc;
+    pub const PSCI_METHOD: &str = "smc";
 }
 
 /// Device-related configuration constants
@@ -45,12 +43,12 @@ pub mod devices {
 
     // UART
     pub const UART_PADDR: usize = CONFIG_PLATFORM_UART_PADDR as usize;
-    pub const UART_IRQ: u32 = CONFIG_PLATFORM_UART_IRQ as u32;
+    pub const UART_IRQ: usize = CONFIG_PLATFORM_UART_IRQ as usize;
 
     // Interrupts
-    pub const TIMER_IRQ: u32 = CONFIG_PLATFORM_TIMER_IRQ as u32;
-    pub const IPI_IRQ: u32 = CONFIG_PLATFORM_IPI_IRQ as u32;
-    pub const PMU_IRQ: u32 = CONFIG_PLATFORM_PMU_IRQ as u32;
+    pub const TIMER_IRQ: usize = CONFIG_PLATFORM_TIMER_IRQ as usize;
+    pub const IPI_IRQ: usize = CONFIG_PLATFORM_IPI_IRQ as usize;
+    pub const PMU_IRQ: usize = CONFIG_PLATFORM_PMU_IRQ as usize;
 
     // GIC (Generic Interrupt Controller)
     pub const GICD_PADDR: usize = CONFIG_PLATFORM_GICD_PADDR as usize;
