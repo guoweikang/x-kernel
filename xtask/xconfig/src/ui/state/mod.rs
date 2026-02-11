@@ -202,6 +202,14 @@ impl ConfigState {
     fn process_entries(&mut self, entries: &[Entry], depth: usize, parent_id: &str) {
         let mut items = Vec::new();
         
+        // Process entries and collect them into items
+        self.collect_items(entries, depth, parent_id, &mut items);
+        
+        self.menu_tree.insert(parent_id.to_string(), items.clone());
+        self.all_items.extend(items);
+    }
+    
+    fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>) {
         for entry in entries {
             match entry {
                 Entry::Config(config) => {
@@ -220,7 +228,7 @@ impl ConfigState {
                     let menu_id = item.id.clone();
                     items.push(item);
                     
-                    // Process menu children
+                    // Process menu children with new parent_id and depth
                     self.process_entries(&menu.entries, depth + 1, &menu_id);
                 }
                 Entry::Choice(choice) => {
@@ -238,8 +246,9 @@ impl ConfigState {
                     items.push(item);
                 }
                 Entry::If(if_entry) => {
-                    // Process if block entries
-                    self.process_entries(&if_entry.entries, depth, parent_id);
+                    // Process if block entries inline - they belong to the same menu level
+                    // The if condition is already part of each entry's depends_on field
+                    self.collect_items(&if_entry.entries, depth, parent_id, items);
                 }
                 Entry::MainMenu(_title) => {
                     // Skip mainmenu for now
@@ -249,9 +258,6 @@ impl ConfigState {
                 }
             }
         }
-        
-        self.menu_tree.insert(parent_id.to_string(), items.clone());
-        self.all_items.extend(items);
     }
     
     pub fn get_items_for_path(&self, path: &[String]) -> Vec<MenuItem> {
