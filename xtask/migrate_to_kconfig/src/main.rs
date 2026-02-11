@@ -48,8 +48,9 @@ fn format_value(value: &toml::Value) -> String {
         }
         toml::Value::String(s) => {
             // If the string looks like a hex number, keep it as is (without quotes for defconfig)
+            // but remove underscores that are used in TOML for readability
             if s.starts_with("0x") || s.starts_with("0X") {
-                s.to_string()
+                s.replace("_", "")
             } else {
                 format!("\"{}\"", s)
             }
@@ -269,12 +270,17 @@ fn main() -> Result<()> {
     println!("🔄 Migrating platconfig.toml to Kconfig defconfig\n");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     
-    // Get the repository root (assuming we're run from xtask/migrate_to_kconfig)
-    let repo_root = std::env::current_dir()?
-        .ancestors()
-        .nth(2)
-        .context("Could not find repository root")?
-        .to_path_buf();
+    // Find the repository root by looking for the platforms directory
+    let mut repo_root = std::env::current_dir()?;
+    loop {
+        let platforms_dir = repo_root.join("platforms");
+        if platforms_dir.exists() && platforms_dir.is_dir() {
+            break;
+        }
+        if !repo_root.pop() {
+            anyhow::bail!("Could not find repository root (platforms directory not found)");
+        }
+    }
     
     let platforms_dir = repo_root.join("platforms");
     
