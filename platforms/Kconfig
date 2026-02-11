@@ -145,20 +145,4 @@ config PLATFORM_GICC_PADDR
 
 endmenu
 
-menu "RTC Configuration"
-
-config PLATFORM_RTC_PL031
-    bool "PL031 RTC"
-    default y
-    help
-      Enable PL031 Real-Time Clock support.
-
-config PLATFORM_RTC_PADDR
-    hex "RTC physical address"
-    default 0x09010000
-    depends on PLATFORM_RTC_PL031
-    help
-      Physical address of the PL031 RTC device.
-
-endmenu
 

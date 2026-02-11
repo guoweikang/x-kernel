@@ -1,0 +1,12 @@
+[package]
+name = "migrate_to_kconfig"
+version = "0.1.0"
+edition = "2021"
+description = "One-time tool to migrate platconfig.toml to Kconfig defconfig"
+
+[workspace]
+
+[dependencies]
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"

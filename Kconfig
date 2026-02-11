@@ -100,28 +100,30 @@ endmenu
 
 menu "Kernel Features"
 
-config FEAT_SMP
+config SMP
     bool "Symmetric Multiprocessing (SMP)"
     default y
 
-config FEAT_FP_SIMD
+config FP_SIMD
     bool "Floating Point and SIMD"
     default y
 
-config FEAT_NET
+config NET
     bool "Network Stack"
     default y
 
-config FEAT_FS
+config FS
     bool "File System Support"
     default y
 
-config FEAT_ALLOC
+config ALLOC
     bool "Dynamic Memory Allocation"
     default y
 
-config FEAT_IRQ
+config IRQ
     bool "Interrupt Support"
     default y
 
 endmenu
+
+source "drivers/Kconfig"

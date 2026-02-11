@@ -9,9 +9,8 @@ homepage.workspace = true
 repository.workspace = true
 
 [features]
-fp-simd = ["kcpu/fp-simd"]
-rtc = []
-smp = ["kplat/smp"]
+FP_SIMD = ["kcpu/fp-simd"]
+SMP = ["kplat/smp"]
 nmi = ["aarch64-peripherals/nmi-pmu", "kplat/nmi", "pmu"]
 pmu = ["kplat/pmu"]
 
@@ -25,3 +24,6 @@ kbuild_config = { workspace = true }
 
 [package.metadata.docs.rs]
 targets = ["aarch64-unknown-none"]
+
+[package.metadata.kbuild]
+enabled = true

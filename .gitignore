@@ -21,10 +21,10 @@
 # Cargo lock
 Cargo.lock
 
-# kernel config
+# Kconfig build artifacts
 .config
 .config.old
 auto.conf
 autoconf.h
-target/kbuild/config.rs
+target/kbuild/
 .cargo/config.toml

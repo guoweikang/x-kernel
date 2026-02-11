@@ -1,0 +1,25 @@
+menu "Drivers Basic Configuration"
+
+config RTC
+    bool "RTC Support"
+    default y
+    help
+      Enable support for Real Time Clock (RTC) devices.
+
+
+if RTC
+
+menu "RTC Configuration"
+
+config PLATFORM_RTC_PADDR
+    hex "RTC physical address"
+    default 0x09010000
+    help
+      Physical address of the RTC device.
+
+endmenu
+
+endif
+
+endmenu
+
