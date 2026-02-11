@@ -24,12 +24,9 @@ ifeq ($(MAKECMDGOALS), doc_check_missing)
   RUSTDOCFLAGS += -D missing-docs
 endif
 
-# Select cargo command: use cargo-kbuild if .config exists, otherwise use cargo
-CARGO_CMD := $(if $(wildcard .config),cargo-kbuild,cargo)
-CARGO_KCONFIG_ARG := $(if $(wildcard .config),--kconfig .config,)
-
+# Always use cargo-kbuild for builds with .config support
 define cargo_build
-  $(call run_cmd,$(CARGO_CMD) -C $(1) build $(CARGO_KCONFIG_ARG),$(build_args) --features "$(strip $(2))")
+  $(call run_cmd,cargo kbuild --kconfig .config -C $(1),$(build_args) --features "$(strip $(2))")
 endef
 
 clippy_args := -A unsafe_op_in_unsafe_fn
