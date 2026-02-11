@@ -58,17 +58,24 @@ pub mod devices {
     #[cfg(CONFIG_PLATFORM_RTC_PL031)]
     pub const RTC_PADDR: usize = CONFIG_PLATFORM_RTC_PADDR as usize;
 
+    // MMIO region sizes
+    const UART_SIZE: usize = 0x1000; // 4KB
+    const GIC_SIZE: usize = 0x10000; // 64KB
+    const RTC_SIZE: usize = 0x1000;  // 4KB
+
     // MMIO ranges for device mapping
+    // Note: Array size is fixed, using (0, 0) as placeholder when RTC is disabled
     pub const MMIO_RANGES: [(usize, usize); 4] = [
         // UART
-        (UART_PADDR, 0x1000),
-        // GIC
-        (GICD_PADDR, 0x10000),
-        (GICC_PADDR, 0x10000),
-        // RTC (if enabled)
+        (UART_PADDR, UART_SIZE),
+        // GIC Distributor
+        (GICD_PADDR, GIC_SIZE),
+        // GIC CPU Interface
+        (GICC_PADDR, GIC_SIZE),
+        // RTC (if enabled, otherwise placeholder)
         #[cfg(CONFIG_PLATFORM_RTC_PL031)]
-        (RTC_PADDR, 0x1000),
+        (RTC_PADDR, RTC_SIZE),
         #[cfg(not(CONFIG_PLATFORM_RTC_PL031))]
-        (0, 0),
+        (0, 0), // Placeholder when RTC is disabled
     ];
 }

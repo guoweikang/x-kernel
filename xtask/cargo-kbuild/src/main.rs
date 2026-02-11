@@ -444,43 +444,39 @@ fn apply_kbuild_config(
     // Add extra arguments
     cargo_args.extend_from_slice(extra_args);
     
-    // Extract top-level cargo options like -C that must come before the subcommand
-    let mut top_level_args: Vec<String> = Vec::new();
-    let mut subcommand_args: Vec<String> = Vec::new();
-    let mut i = 0;
-    while i < cargo_args.len() {
-        if i == 0 {
-            // First element is the subcommand (build, test, etc.)
-            subcommand_args.push(cargo_args[i].clone());
-            i += 1;
-            continue;
+    // Separate top-level cargo options from subcommand arguments
+    // Top-level options like -C and -Z must come before the subcommand
+    let (top_level_args, subcommand_args): (Vec<String>, Vec<String>) = {
+        let mut top_level = Vec::new();
+        let mut subcommand = Vec::new();
+        let mut args_iter = cargo_args.into_iter();
+        
+        // First element is the subcommand (build, test, etc.)
+        if let Some(cmd) = args_iter.next() {
+            subcommand.push(cmd);
         }
         
-        // Check for -C option (directory change)
-        if cargo_args[i] == "-C" && i + 1 < cargo_args.len() {
-            top_level_args.push(cargo_args[i].clone());
-            top_level_args.push(cargo_args[i + 1].clone());
-            i += 2;
-            continue;
+        // Process remaining arguments
+        while let Some(arg) = args_iter.next() {
+            if arg == "-C" || arg == "-Z" {
+                // These options take a value, so collect both
+                top_level.push(arg);
+                if let Some(value) = args_iter.next() {
+                    top_level.push(value);
+                }
+            } else {
+                // All other args go after the subcommand
+                subcommand.push(arg);
+            }
         }
         
-        // Check for -Z option (unstable features)
-        if cargo_args[i] == "-Z" && i + 1 < cargo_args.len() {
-            top_level_args.push(cargo_args[i].clone());
-            top_level_args.push(cargo_args[i + 1].clone());
-            i += 2;
-            continue;
-        }
-        
-        // All other args go after the subcommand
-        subcommand_args.push(cargo_args[i].clone());
-        i += 1;
-    }
+        (top_level, subcommand)
+    };
     
     // Rebuild cargo_args with proper order: top_level_args, subcommand, subcommand_args
-    let mut final_cargo_args: Vec<String> = Vec::new();
-    final_cargo_args.extend(top_level_args);
-    final_cargo_args.extend(subcommand_args);
+    let final_cargo_args: Vec<String> = top_level_args.into_iter()
+        .chain(subcommand_args.into_iter())
+        .collect();
     
     println!("🚀 Running: cargo {}\n", final_cargo_args.join(" "));
     
