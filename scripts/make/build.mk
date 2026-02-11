@@ -42,7 +42,7 @@ else
   RUSTFLAGS += --check-cfg cfg(unittest)
 endif
 
-_cargo_build: oldconfig
+_cargo_build:
 	@printf "    $(GREEN_C)Building$(END_C) App: $(APP_NAME), Arch: $(ARCH), Platform: $(PLAT_NAME)\n"
 	$(call cargo_build,$(APP),$(KFEAT) $(APP_FEAT))
 	@cp $(rust_elf) $(OUT_ELF)
@@ -73,7 +73,7 @@ endif
 $(OUT_UIMG): $(OUT_BIN)
 	$(call run_cmd,mkimage,\
 		-A $(uimg_arch) -O linux -T kernel -C none \
-		-a $(subst _,,$(shell kconfig-gen "$(OUT_CONFIG)" -r plat.kernel-base-paddr)) \
+		-a $(KERNEL_BASE_PADDR) \
 		-d $(OUT_BIN) $@)
 
 .PHONY: _cargo_build _dwarf

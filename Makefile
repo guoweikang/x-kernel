@@ -1,14 +1,9 @@
 # Available arguments:
 # * General options:
-#     - `ARCH`: Target architecture: x86_64, riscv64, aarch64, loongarch64
-#     - `PLAT`: Package name of the target platform crate.
-#     - `PLAT_CONFIG`: Path to the platform configuration file.
-#     - `MODE`: Build mode: release, debug
 #     - `LOG:` Logging level: warn, error, info, debug, trace
 #     - `V`: Verbose level: (empty), 1, 2
 #     - `TARGET_DIR`: Artifact output directory (cargo target directory)
 #     - `EXTRA_CONFIG`: Extra config specification file
-#     - `OUT_CONFIG`: Final config file that takes effect
 #     - `UIMAGE`: To generate U-Boot image
 #     - `LD_SCRIPT`: Use a custom linker script file.
 # * App options:
@@ -35,17 +30,15 @@
 # Enable unstable features
 export RUSTC_BOOTSTRAP := 1
 export DWARF := y
-# General options
-ARCH ?= aarch64
-PLAT ?= $(ARCH)-qemu-virt
-PLAT_CONFIG ?=
-MODE ?= release
+
+# Include Kconfig extraction (must be before ARCH/PLAT defaults)
+-include scripts/make/kconfig.mk
+
 LOG ?= warn
 V ?=
 LTO ?=
 TARGET_DIR ?= $(PWD)/target
 EXTRA_CONFIG ?=
-OUT_CONFIG ?= $(PWD)/.platconfig.toml
 UIMAGE ?= n
 export UNITTEST ?= n
 
@@ -90,7 +83,29 @@ endif
 
 .DEFAULT_GOAL := all
 
-ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build disasm run justrun debug defconfig oldconfig),)
+# Early validation: Check if .config exists for build targets
+# Note: These target lists are also defined in scripts/make/kconfig.mk
+# They must be defined here (before including kconfig.mk) to validate .config early
+BUILD_TARGETS := all build run justrun debug disasm
+KCONFIG_TARGETS := menuconfig defconfig saveconfig oldconfig
+CLEAN_TARGETS := clean clean_c distclean
+UTILITY_TARGETS := clippy doc doc_check_missing fmt unittest unittest_no_fail_fast
+NON_BUILD_TARGETS := $(KCONFIG_TARGETS) $(CLEAN_TARGETS) $(UTILITY_TARGETS)
+
+# Check if current goal requires .config
+REQUIRES_CONFIG := $(filter $(BUILD_TARGETS),$(or $(MAKECMDGOALS),$(.DEFAULT_GOAL)))
+IS_NON_BUILD := $(filter $(NON_BUILD_TARGETS),$(MAKECMDGOALS))
+
+# Only check for .config if we're building and not running a config/clean target
+ifneq ($(REQUIRES_CONFIG),)
+  ifeq ($(IS_NON_BUILD),)
+    ifeq ($(wildcard .config),)
+      $(error ❌ No .config found. Please run: make menuconfig  OR  cp defconfig .config)
+    endif
+  endif
+endif
+
+ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build disasm run justrun debug defconfig oldconfig menuconfig),)
 # Install dependencies
 include scripts/make/deps.mk
 # Platform resolving
@@ -120,14 +135,6 @@ export K_LOG=$(LOG)
 export K_TARGET=$(TARGET)
 export K_IP=$(IP)
 export K_GW=$(GW)
-
-ifneq ($(filter $(MAKECMDGOALS),unittest unittest_no_fail_fast clippy doc doc_check_missing),)
-  # When running unit tests or other tests unrelated to a specific platform,
-  # set `PLAT_CONFIG_PATH` to empty for dummy config
-  unexport PLAT_CONFIG_PATH
-else
-  export PLAT_CONFIG_PATH=$(OUT_CONFIG)
-endif
 
 # Binutils
 CROSS_COMPILE ?= $(ARCH)-linux-musl-
@@ -168,6 +175,14 @@ endif
 ROOTFS_URL = https://github.com/Starry-OS/rootfs/releases/download/20250917
 ROOTFS_IMG = rootfs-$(ARCH).img
 
+menuconfig:
+	@xconf menuconfig -k Kconfig -s .
+	@if [ -f .config ]; then \
+		echo "✅ Configuration saved to .config"; \
+	else \
+		echo "ℹ️  No changes saved"; \
+	fi
+
 rootfs:
 	@if [ ! -f $(ROOTFS_IMG) ]; then \
 		echo "Image not found, downloading..."; \
@@ -180,10 +195,19 @@ teefs:
 	$(MAKE) -C tee_apps ARCH=$(ARCH)
 
 defconfig:
-	$(call defconfig)
+	@xconf saveconfig -o .config -k Kconfig -s .
+	@echo "✅ Default configuration saved to .config"
+
+saveconfig:
+	@xconf saveconfig -o .config -k Kconfig -s .
 
 oldconfig:
-	$(call oldconfig)
+	@if [ ! -f .config ]; then \
+		echo "$(RED_C)Error$(END_C): .config not found."; \
+		echo "Please run 'make defconfig' or 'make menuconfig' first."; \
+		exit 1; \
+	fi
+	@xconf oldconfig -c .config -k Kconfig -s .
 
 build: $(OUT_DIR) $(FINAL_IMG)
 
@@ -233,13 +257,18 @@ else
 endif
 
 clean: clean_c
-	rm -rf $(APP)/*.bin $(APP)/*.elf $(OUT_CONFIG)
+	rm -rf $(APP)/*.bin $(APP)/*.elf
 	cargo clean
+	@rm -f target/kbuild/config.rs .cargo/config.toml
+
+distclean: clean
+	@rm -f .config .config.old auto.conf autoconf.h
+	@echo "✅ Removed all configuration files"
 
 clean_c::
 	rm -rf $(app-objs)
 
-.PHONY: all defconfig oldconfig \
+.PHONY: all defconfig oldconfig menuconfig saveconfig \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
-	disk_img clean clean_c
+	disk_img clean distclean clean_c

@@ -1,0 +1,164 @@
+menu "Platform Basic Configuration"
+
+config PLATFORM_CPU_NUM
+    int "Number of CPUs"
+    range 1 256
+    default 4
+    help
+      Number of CPUs available on the platform.
+
+config PLATFORM_PHYS_MEM_BASE
+    hex "Physical memory base address"
+    default 0x40000000
+    help
+      Base physical address of the system memory.
+
+config PLATFORM_PHYS_MEM_SIZE
+    hex "Physical memory size"
+    default 0x08000000
+    help
+      Total size of the physical memory.
+
+config PLATFORM_KERNEL_BASE_PADDR
+    hex "Kernel base physical address"
+    default 0x40200000
+    help
+      Physical load address of the kernel image.
+
+config PLATFORM_KERNEL_BASE_VADDR
+    hex "Kernel base virtual address"
+    default 0xffff000040200000
+    help
+      Virtual address where the kernel is mapped.
+
+config PLATFORM_PHYS_VIRT_OFFSET
+    hex "Physical to virtual address offset"
+    default 0xffff000000000000
+    help
+      Offset used to convert physical addresses to virtual addresses.
+
+config PLATFORM_PHYS_BUS_OFFSET
+    hex "Physical to bus address offset"
+    default 0x0
+    help
+      Offset between physical address and bus address.
+
+config PLATFORM_KERNEL_ASPACE_BASE
+    hex "Kernel address space base"
+    default 0xffff000000000000
+    help
+      Base address of the kernel virtual address space.
+
+config PLATFORM_KERNEL_ASPACE_SIZE
+    hex "Kernel address space size"
+    default 0x0000fffffffff000
+    help
+      Size of the kernel virtual address space.
+
+config PLATFORM_BOOT_STACK_SIZE
+    hex "Boot stack size"
+    default 0x40000
+    help
+      Stack size used during kernel boot.
+
+endmenu
+
+menu "Platform DMA and Power Management"
+
+config PLATFORM_DMA_MEM_BASE
+    hex "DMA memory base address"
+    default 0x40000000
+    help
+      Base physical address of DMA memory.
+
+config PLATFORM_DMA_MEM_SIZE
+    hex "DMA memory size"
+    default 0x00200000
+    help
+      Size of the DMA memory region.
+
+choice
+    prompt "PSCI invocation method"
+    default PLATFORM_PSCI_HVC
+
+config PLATFORM_PSCI_HVC
+    bool "HVC (Hypervisor Call)"
+    help
+      Use HVC instruction for PSCI calls.
+
+config PLATFORM_PSCI_SMC
+    bool "SMC (Secure Monitor Call)"
+    help
+      Use SMC instruction for PSCI calls.
+
+endchoice
+
+endmenu
+
+menu "Platform Devices and Interrupts"
+
+config PLATFORM_UART_PADDR
+    hex "UART physical address"
+    default 0x09000000
+    help
+      Physical address of the UART controller.
+
+config PLATFORM_UART_IRQ
+    int "UART IRQ number"
+    default 33
+    help
+      Interrupt number for UART device.
+
+config PLATFORM_TIMER_IRQ
+    int "Timer IRQ number"
+    default 30
+    help
+      Interrupt number for the physical timer.
+
+config PLATFORM_IPI_IRQ
+    int "IPI IRQ number"
+    default 1
+    help
+      Inter-Processor Interrupt number.
+
+config PLATFORM_PMU_IRQ
+    int "PMU IRQ number"
+    default 23
+    help
+      Performance Monitoring Unit interrupt number.
+
+endmenu
+
+menu "Generic Interrupt Controller (GIC)"
+
+config PLATFORM_GICD_PADDR
+    hex "GIC Distributor base address"
+    default 0x08000000
+    help
+      Base physical address of the GIC Distributor.
+
+config PLATFORM_GICC_PADDR
+    hex "GIC CPU Interface base address"
+    default 0x08010000
+    help
+      Base physical address of the GIC CPU Interface.
+
+endmenu
+
+menu "RTC Configuration"
+
+config PLATFORM_RTC_PL031
+    bool "PL031 RTC"
+    default y
+    help
+      Enable PL031 Real-Time Clock support.
+
+config PLATFORM_RTC_PADDR
+    hex "RTC physical address"
+    default 0x09010000
+    depends on PLATFORM_RTC_PL031
+    help
+      Physical address of the PL031 RTC device.
+
+endmenu
+
