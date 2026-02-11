@@ -23,5 +23,8 @@ Cargo.lock
 
 # kernel config
 .config
+.config.old
 auto.conf
 autoconf.h
+target/kbuild/config.rs
+.cargo/config.toml

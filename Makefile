@@ -94,6 +94,28 @@ endif
 
 .DEFAULT_GOAL := all
 
+# Early validation: Check if .config exists for build targets
+# Note: These target lists are also defined in scripts/make/kconfig.mk
+# They must be defined here (before including kconfig.mk) to validate .config early
+BUILD_TARGETS := all build run justrun debug disasm
+KCONFIG_TARGETS := menuconfig defconfig saveconfig oldconfig
+CLEAN_TARGETS := clean clean_c distclean
+UTILITY_TARGETS := clippy doc doc_check_missing fmt unittest unittest_no_fail_fast
+NON_BUILD_TARGETS := $(KCONFIG_TARGETS) $(CLEAN_TARGETS) $(UTILITY_TARGETS)
+
+# Check if current goal requires .config
+REQUIRES_CONFIG := $(filter $(BUILD_TARGETS),$(or $(MAKECMDGOALS),$(.DEFAULT_GOAL)))
+IS_NON_BUILD := $(filter $(NON_BUILD_TARGETS),$(MAKECMDGOALS))
+
+# Only check for .config if we're building and not running a config/clean target
+ifneq ($(REQUIRES_CONFIG),)
+  ifeq ($(IS_NON_BUILD),)
+    ifeq ($(wildcard .config),)
+      $(error ❌ No .config found. Please run: make menuconfig  OR  make defconfig)
+    endif
+  endif
+endif
+
 ifneq ($(filter $(or $(MAKECMDGOALS), $(.DEFAULT_GOAL)), all build disasm run justrun debug defconfig oldconfig menuconfig),)
 # Install dependencies
 include scripts/make/deps.mk
@@ -269,7 +291,7 @@ clean: clean_c
 	@rm -f target/kbuild/config.rs .cargo/config.toml
 
 distclean: clean
-	@rm -f .config auto.conf autoconf.h
+	@rm -f .config .config.old auto.conf autoconf.h $(OUT_CONFIG)
 	@echo "✅ Removed all configuration files"
 
 clean_c::
