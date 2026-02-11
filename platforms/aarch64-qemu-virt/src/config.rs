@@ -67,12 +67,18 @@ pub mod devices {
     const UART_SIZE: usize = 0x1000; // 4KB
     const GIC_SIZE: usize = 0x10000; // 64KB
     const RTC_SIZE: usize = 0x1000;  // 4KB
+    
+    // VirtIO device region (QEMU virt machine specification)
     const VIRTIO_BASE: usize = 0x0a00_0000;
-    const VIRTIO_SIZE: usize = 0x4000;
+    const VIRTIO_SIZE: usize = 0x4000; // 16KB per device
+    
+    // PCI memory-mapped I/O space (32-bit MMIO window)
     const PCI_MEM_BASE: usize = 0x1000_0000;
-    const PCI_MEM_SIZE: usize = 0x2eff_0000;
+    const PCI_MEM_SIZE: usize = 0x2eff_0000; // ~750MB
+    
+    // PCI configuration space (ECAM - Enhanced Configuration Access Mechanism)
     const PCI_CFG_BASE: usize = 0x40_1000_0000;
-    const PCI_CFG_SIZE: usize = 0x1000_0000;
+    const PCI_CFG_SIZE: usize = 0x1000_0000; // 256MB
 
     // MMIO ranges for device mapping (RTC enabled)
     #[cfg(RTC)]
