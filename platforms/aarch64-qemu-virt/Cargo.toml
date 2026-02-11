@@ -25,3 +25,6 @@ kbuild_config = { workspace = true }
 
 [package.metadata.docs.rs]
 targets = ["aarch64-unknown-none"]
+
+[package.metadata.kbuild]
+enabled = true

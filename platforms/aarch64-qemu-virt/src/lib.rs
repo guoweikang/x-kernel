@@ -11,8 +11,9 @@ mod boot;
 mod init;
 mod mem;
 mod power;
-pub mod config {
-}
+
+// Platform configuration module (generated from Kconfig)
+pub mod config;
 aarch64_peripherals::console_if_impl!(ConsoleImpl);
 aarch64_peripherals::time_if_impl!(GlobalTimerImpl);
 aarch64_peripherals::irq_if_impl!(IntrManagerImpl);
