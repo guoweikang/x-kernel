@@ -18,6 +18,7 @@ pub struct MenuItem {
     pub implies: Vec<String>,
     pub selected_by: Vec<String>,
     pub implied_by: Vec<String>,
+    pub parent_choice: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,7 @@ impl MenuItem {
             implies: config.properties.imply.iter().map(|(s, _)| s.clone()).collect(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -85,6 +87,7 @@ impl MenuItem {
             implies: config.properties.imply.iter().map(|(s, _)| s.clone()).collect(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -106,6 +109,7 @@ impl MenuItem {
             implies: Vec::new(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -128,6 +132,7 @@ impl MenuItem {
             implies: Vec::new(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
     
@@ -149,6 +154,7 @@ impl MenuItem {
             implies: Vec::new(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
+            parent_choice: None,
         }
     }
 }
@@ -238,12 +244,26 @@ impl ConfigState {
                     self.process_entries(&menu.entries, depth + 1, &menu_id);
                 }
                 Entry::Choice(choice) => {
-                    let item = MenuItem::from_choice(choice, depth);
+                    // Generate unique choice ID if not named
+                    let choice_id = if let Some(name) = &choice.name {
+                        name.clone()
+                    } else {
+                        // Use the first option name to generate a unique ID
+                        if let Some(first_option) = choice.options.first() {
+                            format!("choice_{}", first_option.name)
+                        } else {
+                            "choice_unknown".to_string()
+                        }
+                    };
+                    
+                    let mut item = MenuItem::from_choice(choice, depth);
+                    item.id = choice_id.clone();
                     items.push(item);
                     
-                    // Add choice options as children
+                    // Add choice options as children with parent_choice set
                     for option in &choice.options {
-                        let opt_item = MenuItem::from_config(option, depth + 1);
+                        let mut opt_item = MenuItem::from_config(option, depth + 1);
+                        opt_item.parent_choice = Some(choice_id.clone());
                         items.push(opt_item);
                     }
                 }

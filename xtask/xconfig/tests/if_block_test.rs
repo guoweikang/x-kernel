@@ -66,8 +66,8 @@ endmenu
     // Verify that all items are collected (including those in if blocks)
     let all_item_ids: Vec<String> = config_state.all_items.iter().map(|i| i.id.clone()).collect();
     
-    // Should contain the architecture choice and its options
-    assert!(all_item_ids.contains(&"choice".to_string()), "Should contain architecture choice");
+    // Should contain the architecture choice and its options (choice ID is based on first option)
+    assert!(all_item_ids.contains(&"choice_ARCH_AARCH64".to_string()), "Should contain architecture choice");
     assert!(all_item_ids.contains(&"ARCH_AARCH64".to_string()), "Should contain ARCH_AARCH64");
     assert!(all_item_ids.contains(&"ARCH_RISCV64".to_string()), "Should contain ARCH_RISCV64");
     

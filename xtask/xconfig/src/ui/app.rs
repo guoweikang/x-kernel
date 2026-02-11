@@ -1020,6 +1020,11 @@ impl MenuConfigApp {
         let item = &items[self.navigation.selected_index];
         let item_id = item.id.clone();
         
+        // Check if this is a choice option
+        if let Some(parent_choice_id) = &item.parent_choice {
+            return self.handle_choice_selection(parent_choice_id, &item_id);
+        }
+        
         // Check if this is a string/int/hex config item that needs editing
         if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
             match symbol_type {
@@ -1152,6 +1157,65 @@ impl MenuConfigApp {
             self.sync_ui_state_from_symbol_table()?;
             self.update_enabled_states()?;
         }
+        
+        Ok(())
+    }
+    
+    /// Get all option IDs belonging to a choice.
+    /// 
+    /// Returns a vector of config option IDs that are children of the specified choice.
+    /// Used by `handle_choice_selection` to implement mutual exclusion.
+    fn get_choice_options(&self, choice_id: &str) -> Vec<String> {
+        self.config_state
+            .all_items
+            .iter()
+            .filter(|item| {
+                item.parent_choice.as_ref().map(|pc| pc == choice_id).unwrap_or(false)
+            })
+            .map(|item| item.id.clone())
+            .collect()
+    }
+    
+    /// Handle choice selection with mutual exclusion.
+    /// 
+    /// This method enforces Kconfig's choice mutual exclusion semantics:
+    /// when a user selects one option in a choice, all other options are automatically deselected.
+    /// 
+    /// # Arguments
+    /// * `choice_id` - The ID of the parent choice
+    /// * `selected_option` - The ID of the option being selected
+    /// 
+    /// # Behavior
+    /// 1. Gets all options belonging to the choice
+    /// 2. Disables all options except the selected one (mutual exclusion)
+    /// 3. Enables the selected option
+    /// 4. Updates UI state to reflect changes
+    fn handle_choice_selection(&mut self, choice_id: &str, selected_option: &str) -> Result<()> {
+        // 1. Get all options in this choice
+        let choice_options = self.get_choice_options(choice_id);
+        
+        // 2. Disable all other options (mutual exclusion)
+        for option_id in &choice_options {
+            if option_id != selected_option {
+                self.apply_value_change(
+                    option_id,
+                    ConfigValue::Bool(false)
+                )?;
+            }
+        }
+        
+        // 3. Enable the selected option
+        self.apply_value_change(
+            selected_option,
+            ConfigValue::Bool(true)
+        )?;
+        
+        // 4. Update UI state
+        self.sync_ui_state_from_symbol_table()?;
+        self.update_enabled_states()?;
+        
+        // 5. Show status message
+        self.status_message = Some(format!(" {} selected", selected_option));
         
         Ok(())
     }
