@@ -23,6 +23,10 @@ pub mod plat {
     #[cfg(PLATFORM_PSCI_SMC)]
     pub const PSCI_METHOD: &str = "smc";
 
+    // Default to HVC if neither is explicitly set
+    #[cfg(not(any(PLATFORM_PSCI_HVC, PLATFORM_PSCI_SMC)))]
+    pub const PSCI_METHOD: &str = "hvc";
+
     // Memory layout
     pub const PHYS_MEMORY_BASE: usize = PLATFORM_PHYS_MEM_BASE as usize;
     pub const PHYS_MEMORY_SIZE: usize = PLATFORM_PHYS_MEM_SIZE as usize;
@@ -59,26 +63,37 @@ pub mod devices {
     pub const UART_PADDR: usize = PLATFORM_UART_PADDR as usize;
     pub const UART_IRQ: usize = PLATFORM_UART_IRQ as usize;
 
-    // MMIO region sizes
+    // MMIO region sizes (private constants)
     const UART_SIZE: usize = 0x1000; // 4KB
     const GIC_SIZE: usize = 0x10000; // 64KB
     const RTC_SIZE: usize = 0x1000;  // 4KB
-    // MMIO ranges for device mapping
-    // Note: Array size is fixed, using (0, 0) as placeholder when RTC is disabled
+    const VIRTIO_BASE: usize = 0x0a00_0000;
+    const VIRTIO_SIZE: usize = 0x4000;
+    const PCI_MEM_BASE: usize = 0x1000_0000;
+    const PCI_MEM_SIZE: usize = 0x2eff_0000;
+    const PCI_CFG_BASE: usize = 0x40_1000_0000;
+    const PCI_CFG_SIZE: usize = 0x1000_0000;
+
+    // MMIO ranges for device mapping (RTC enabled)
+    #[cfg(RTC)]
     pub const MMIO_RANGES: [(usize, usize); 7] = [
-        // UART
         (UART_PADDR, UART_SIZE),
-        // GIC Distributor
         (GICD_PADDR, GIC_SIZE),
-        // GIC CPU Interface
         (GICC_PADDR, GIC_SIZE),
-        // RTC (if enabled, otherwise placeholder)
-        #[cfg(RTC)]
         (RTC_PADDR, RTC_SIZE),
-        #[cfg(not(RTC))]
-        (0, 0), // Placeholder when RTC is disabled
-        (0x0a00_0000, 0x4000),      // VirtIO
-        (0x1000_0000, 0x2eff_0000),     // PCI memory ranges (ranges 1: 32-bit MMIO space)
-        (0x40_1000_0000, 0x1000_0000), // PCI config space
+        (VIRTIO_BASE, VIRTIO_SIZE),
+        (PCI_MEM_BASE, PCI_MEM_SIZE),
+        (PCI_CFG_BASE, PCI_CFG_SIZE),
+    ];
+
+    // MMIO ranges for device mapping (RTC disabled)
+    #[cfg(not(RTC))]
+    pub const MMIO_RANGES: [(usize, usize); 6] = [
+        (UART_PADDR, UART_SIZE),
+        (GICD_PADDR, GIC_SIZE),
+        (GICC_PADDR, GIC_SIZE),
+        (VIRTIO_BASE, VIRTIO_SIZE),
+        (PCI_MEM_BASE, PCI_MEM_SIZE),
+        (PCI_CFG_BASE, PCI_CFG_SIZE),
     ];
 }
