@@ -148,16 +148,25 @@ fn extract_symbols_from_entries(entries: &[xconfig::kconfig::ast::Entry], symbol
                     
                     if should_apply {
                         // Apply this default and stop checking further defaults
+                        let mut applied = false;
                         if let Expr::Const(val) = default_value {
                             symbol_table.set_value(&config.name, val.clone());
+                            applied = true;
+                        } else if let Expr::Symbol(sym) = default_value {
+                            symbol_table.set_value(&config.name, sym.clone());
+                            applied = true;
                         } else if let Expr::ShellExpr(shell_expr) = default_value {
                             if let Ok(value) = xconfig::kconfig::shell_expr::evaluate_shell_expr(shell_expr, symbol_table) {
                                 if !value.is_empty() {
                                     symbol_table.set_value(&config.name, value);
+                                    applied = true;
                                 }
                             }
                         }
-                        break;  // Stop at first matching default
+                        
+                        if applied {
+                            break;  // Stop at first matching default that was successfully applied
+                        }
                     }
                 }
             }
