@@ -42,9 +42,6 @@ endchoice
     
     // Create MenuConfigApp to verify UI initialization
     let _app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
-    
-    // Verify the app was created successfully
-    assert!(true); // If we got here, initialization worked
 }
 
 /// Test that a Choice without a default has first option selected
@@ -85,7 +82,6 @@ endchoice
     
     // Create MenuConfigApp
     let _app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
-    assert!(true); // If we got here, initialization worked
 }
 
 /// Test shell expression in config default value

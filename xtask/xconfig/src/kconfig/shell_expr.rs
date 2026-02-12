@@ -70,10 +70,23 @@ fn split_if_parts(input: &str) -> Result<Vec<String>> {
     let mut current = String::new();
     let mut depth = 0;
     let mut in_string = false;
+    let mut escape_next = false;
     let mut chars = input.chars().peekable();
     
     while let Some(ch) = chars.next() {
+        if escape_next {
+            // Previous character was a backslash, so this character is escaped
+            current.push(ch);
+            escape_next = false;
+            continue;
+        }
+        
         match ch {
+            '\\' if in_string => {
+                // Mark that next character should be escaped
+                escape_next = true;
+                current.push(ch);
+            }
             '"' => {
                 in_string = !in_string;
                 current.push(ch);
@@ -188,5 +201,17 @@ mod tests {
         let expr = "$(if $(ARCH_AARCH64),aarch64,$(if $(ARCH_X86_64),x86_64,unknown))";
         let result = evaluate_shell_expr(expr, &symbols).unwrap();
         assert_eq!(result, "unknown");
+    }
+    
+    #[test]
+    fn test_escaped_quotes_in_string() {
+        let mut symbols = SymbolTable::new();
+        symbols.add_symbol("USE_QUOTES".to_string(), SymbolType::Bool);
+        symbols.set_value("USE_QUOTES", "y".to_string());
+        
+        // Test that escaped quotes don't break the parser
+        let expr = r#"$(if $(USE_QUOTES),"value with \"quotes\"",plain)"#;
+        let result = evaluate_shell_expr(expr, &symbols).unwrap();
+        assert_eq!(result, r#""value with \"quotes\"""#);
     }
 }
