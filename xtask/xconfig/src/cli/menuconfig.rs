@@ -71,6 +71,13 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbol_t
                 if let Some(default_expr) = &config.properties.default {
                     if let crate::kconfig::Expr::Const(val) = default_expr {
                         symbol_table.set_value(&config.name, val.clone());
+                    } else if let crate::kconfig::Expr::ShellExpr(shell_expr) = default_expr {
+                        // Evaluate shell expression for default
+                        if let Ok(value) = crate::kconfig::shell_expr::evaluate_shell_expr(shell_expr, symbol_table) {
+                            if !value.is_empty() {
+                                symbol_table.set_value(&config.name, value);
+                            }
+                        }
                     }
                 }
             }
@@ -80,6 +87,14 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbol_t
             Entry::Choice(choice) => {
                 for option in &choice.options {
                     symbol_table.add_symbol(option.name.clone(), option.symbol_type.clone());
+                }
+                
+                // Apply choice default if specified
+                if let Some(default_name) = &choice.default {
+                    symbol_table.set_value(default_name, "y".to_string());
+                } else if let Some(first_option) = choice.options.first() {
+                    // No default specified, select first option (standard Kconfig behavior)
+                    symbol_table.set_value(&first_option.name, "y".to_string());
                 }
             }
             Entry::Menu(menu) => {
