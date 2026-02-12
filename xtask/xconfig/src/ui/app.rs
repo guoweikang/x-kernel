@@ -184,6 +184,45 @@ impl MenuConfigApp {
         }
     }
     
+    /// Filter menu items based on visibility rules:
+    /// 1. Items without prompts are hidden (internal variables)
+    /// 2. Items with unsatisfied depends_on conditions are hidden
+    pub fn filter_visible_items(&self, items: Vec<MenuItem>) -> Vec<MenuItem> {
+        use crate::ui::dependency_resolver::ExprEvaluator;
+        let evaluator = ExprEvaluator::new();
+        
+        items.into_iter()
+            .filter(|item| {
+                // Rule 1: Config/MenuConfig items without prompts are never shown
+                match &item.kind {
+                    MenuItemKind::Config { .. } | MenuItemKind::MenuConfig { .. } => {
+                        if !item.has_prompt {
+                            return false;
+                        }
+                    }
+                    MenuItemKind::Choice { .. } => {
+                        if !item.has_prompt {
+                            return false;
+                        }
+                    }
+                    _ => {} // Menus and Comments are always visible if dependencies are met
+                }
+                
+                // Rule 2: Check depends_on condition
+                if let Some(depends_expr) = &item.depends_on {
+                    return evaluator.evaluate(depends_expr, &self.symbol_table);
+                }
+                
+                true
+            })
+            .collect()
+    }
+    
+    /// Get reference to config_state (for testing)
+    pub fn config_state(&self) -> &ConfigState {
+        &self.config_state
+    }
+    
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
             terminal.draw(|f| self.render(f))?;
@@ -318,7 +357,10 @@ impl MenuConfigApp {
             self.config_state.get_items_for_path(&self.navigation.current_path)
         };
         
-        if items.is_empty() {
+        // Apply visibility filtering
+        let visible_items = self.filter_visible_items(items);
+        
+        if visible_items.is_empty() {
             let empty = Paragraph::new("No items found")
                 .block(Block::default()
                     .borders(Borders::ALL)
@@ -328,11 +370,11 @@ impl MenuConfigApp {
         }
         
         // Ensure selected index is valid
-        if self.navigation.selected_index >= items.len() {
-            self.navigation.selected_index = items.len().saturating_sub(1);
+        if self.navigation.selected_index >= visible_items.len() {
+            self.navigation.selected_index = visible_items.len().saturating_sub(1);
         }
         
-        let list_items: Vec<ListItem> = items
+        let list_items: Vec<ListItem> = visible_items
             .iter()
             .enumerate()
             .map(|(idx, item)| {
@@ -414,7 +456,10 @@ impl MenuConfigApp {
             self.config_state.get_items_for_path(&self.navigation.current_path)
         };
         
-        if items.is_empty() || self.navigation.selected_index >= items.len() {
+        // Apply visibility filtering
+        let visible_items = self.filter_visible_items(items);
+        
+        if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
             let empty = Paragraph::new("No item selected")
                 .block(Block::default()
                     .borders(Borders::ALL)
@@ -423,7 +468,7 @@ impl MenuConfigApp {
             return;
         }
         
-        let item = &items[self.navigation.selected_index];
+        let item = &visible_items[self.navigation.selected_index];
         
         let mut text_lines = vec![];
         
@@ -981,8 +1026,11 @@ impl MenuConfigApp {
             self.config_state.get_items_for_path(&self.navigation.current_path)
         };
         
-        if !items.is_empty() {
-            self.navigation.selected_index = (self.navigation.selected_index + 10).min(items.len() - 1);
+        // Apply visibility filtering
+        let visible_items = self.filter_visible_items(items);
+        
+        if !visible_items.is_empty() {
+            self.navigation.selected_index = (self.navigation.selected_index + 10).min(visible_items.len() - 1);
         }
     }
     
@@ -999,8 +1047,11 @@ impl MenuConfigApp {
             self.config_state.get_items_for_path(&self.navigation.current_path)
         };
         
-        if !items.is_empty() {
-            self.navigation.selected_index = items.len() - 1;
+        // Apply visibility filtering
+        let visible_items = self.filter_visible_items(items);
+        
+        if !visible_items.is_empty() {
+            self.navigation.selected_index = visible_items.len() - 1;
         }
     }
     
@@ -1013,11 +1064,14 @@ impl MenuConfigApp {
             self.config_state.get_items_for_path(&self.navigation.current_path)
         };
         
-        if items.is_empty() || self.navigation.selected_index >= items.len() {
+        // Apply visibility filtering
+        let visible_items = self.filter_visible_items(items);
+        
+        if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
             return Ok(());
         }
         
-        let item = &items[self.navigation.selected_index];
+        let item = &visible_items[self.navigation.selected_index];
         let item_id = item.id.clone();
         
         // Check if this is a choice option

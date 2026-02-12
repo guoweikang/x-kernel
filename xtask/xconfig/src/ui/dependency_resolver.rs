@@ -306,14 +306,14 @@ impl std::fmt::Display for DependencyError {
 impl std::error::Error for DependencyError {}
 
 /// Simple expression evaluator
-struct ExprEvaluator;
+pub struct ExprEvaluator;
 
 impl ExprEvaluator {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
     
-    fn evaluate(&self, expr: &Expr, symbol_table: &SymbolTable) -> bool {
+    pub fn evaluate(&self, expr: &Expr, symbol_table: &SymbolTable) -> bool {
         match expr {
             Expr::Symbol(name) => symbol_table.is_enabled(name),
             Expr::Const(val) => {
