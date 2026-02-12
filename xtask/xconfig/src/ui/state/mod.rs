@@ -2,6 +2,11 @@ use crate::kconfig::ast::{Entry, Menu, Config, MenuConfig, Choice, Comment};
 use crate::kconfig::{SymbolType, Expr};
 use std::collections::HashMap;
 
+// Helper function to check if debug logging is enabled
+fn is_debug_enabled() -> bool {
+    std::env::var("XCONFIG_DEBUG").is_ok()
+}
+
 #[derive(Debug, Clone)]
 pub struct MenuItem {
     pub id: String,
@@ -214,8 +219,32 @@ impl ConfigState {
     fn process_entries(&mut self, entries: &[Entry], depth: usize, parent_id: &str) {
         let mut items = Vec::new();
         
+        if is_debug_enabled() {
+            eprintln!("🔹 process_entries: parent_id='{}', depth={}, entries_count={}", 
+                      parent_id, depth, entries.len());
+        }
+        
         // Process entries and collect them into items
         self.collect_items(entries, depth, parent_id, &mut items, None);
+        
+        if is_debug_enabled() {
+            eprintln!("🔹 Inserting into menu_tree: key='{}', items_count={}", 
+                      parent_id, items.len());
+            for (i, item) in items.iter().enumerate() {
+                eprintln!("    [{}] id='{}', label='{}', kind={:?}", i, item.id, item.label, 
+                         match &item.kind {
+                             MenuItemKind::Menu { .. } => "Menu",
+                             MenuItemKind::Config { .. } => "Config",
+                             MenuItemKind::MenuConfig { .. } => "MenuConfig",
+                             MenuItemKind::Choice { .. } => "Choice",
+                             MenuItemKind::Comment { .. } => "Comment",
+                         });
+            }
+            
+            if self.menu_tree.contains_key(parent_id) {
+                eprintln!("⚠️  WARNING: Overwriting menu_tree key: '{}'", parent_id);
+            }
+        }
         
         self.menu_tree.insert(parent_id.to_string(), items.clone());
         self.all_items.extend(items);
@@ -341,7 +370,29 @@ impl ConfigState {
             path.last().unwrap().clone()
         };
         
-        self.menu_tree.get(&key).cloned().unwrap_or_default()
+        if is_debug_enabled() {
+            eprintln!("🔍 get_items_for_path: key='{}', path={:?}", key, path);
+        }
+        
+        let items = self.menu_tree.get(&key).cloned().unwrap_or_else(|| {
+            if is_debug_enabled() {
+                eprintln!("❌ Key not found in menu_tree: '{}'", key);
+                eprintln!("Available keys: {:?}", self.menu_tree.keys().collect::<Vec<_>>());
+            }
+            Vec::new()
+        });
+        
+        if is_debug_enabled() {
+            eprintln!("📋 Returning {} items for key '{}'", items.len(), key);
+            for item in items.iter().take(3) {
+                eprintln!("    - {}: {}", item.id, item.label);
+            }
+            if items.len() > 3 {
+                eprintln!("    ... and {} more items", items.len() - 3);
+            }
+        }
+        
+        items
     }
     
     fn build_reverse_dependencies(&mut self) {
