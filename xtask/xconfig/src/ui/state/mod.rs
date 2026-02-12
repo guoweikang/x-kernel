@@ -215,7 +215,7 @@ impl ConfigState {
         let mut items = Vec::new();
         
         // Process entries and collect them into items
-        self.collect_items(entries, depth, parent_id, &mut items);
+        self.collect_items(entries, depth, parent_id, &mut items, None);
         
         self.menu_tree.insert(parent_id.to_string(), items.clone());
         self.all_items.extend(items);
@@ -227,22 +227,37 @@ impl ConfigState {
     /// entries within if blocks are collected into the same items vector as their siblings.
     /// This prevents menu tree overwrites that would occur if if-blocks were processed via
     /// separate calls to `process_entries()`.
-    fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>) {
+    /// 
+    /// The `if_condition` parameter is used to propagate if-block conditions to items inside them,
+    /// combining with their existing depends_on expressions.
+    fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>, if_condition: Option<&Expr>) {
         for entry in entries {
             match entry {
                 Entry::Config(config) => {
-                    let item = MenuItem::from_config(config, depth);
+                    let mut item = MenuItem::from_config(config, depth);
+                    // Combine if_condition with existing depends_on
+                    if let Some(if_cond) = if_condition {
+                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                    }
                     items.push(item);
                 }
                 Entry::MenuConfig(menuconfig) => {
-                    let item = MenuItem::from_menuconfig(menuconfig, depth);
+                    let mut item = MenuItem::from_menuconfig(menuconfig, depth);
+                    // Combine if_condition with existing depends_on
+                    if let Some(if_cond) = if_condition {
+                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                    }
                     items.push(item.clone());
                     
                     // MenuConfig can have sub-items (not in this simple version)
                     // In a full implementation, we'd recursively process
                 }
                 Entry::Menu(menu) => {
-                    let item = MenuItem::from_menu(menu, depth);
+                    let mut item = MenuItem::from_menu(menu, depth);
+                    // Combine if_condition with existing depends_on
+                    if let Some(if_cond) = if_condition {
+                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                    }
                     let menu_id = item.id.clone();
                     items.push(item);
                     
@@ -264,23 +279,40 @@ impl ConfigState {
                     
                     let mut item = MenuItem::from_choice(choice, depth);
                     item.id = choice_id.clone();
+                    // Combine if_condition with existing depends_on
+                    if let Some(if_cond) = if_condition {
+                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                    }
                     items.push(item);
                     
                     // Add choice options as children with parent_choice set
                     for option in &choice.options {
                         let mut opt_item = MenuItem::from_config(option, depth + 1);
                         opt_item.parent_choice = Some(choice_id.clone());
+                        // Combine if_condition with option's depends_on as well
+                        if let Some(if_cond) = if_condition {
+                            opt_item.depends_on = Some(Self::combine_conditions(opt_item.depends_on.as_ref(), if_cond));
+                        }
                         items.push(opt_item);
                     }
                 }
                 Entry::Comment(comment) => {
-                    let item = MenuItem::from_comment(comment, depth);
+                    let mut item = MenuItem::from_comment(comment, depth);
+                    // Combine if_condition with existing depends_on
+                    if let Some(if_cond) = if_condition {
+                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                    }
                     items.push(item);
                 }
                 Entry::If(if_entry) => {
                     // Process if block entries inline - they belong to the same menu level
-                    // The if condition is already part of each entry's depends_on field
-                    self.collect_items(&if_entry.entries, depth, parent_id, items);
+                    // Propagate the if condition by combining it with any existing if_condition
+                    let combined_condition = if let Some(outer_if_cond) = if_condition {
+                        Self::combine_conditions(Some(outer_if_cond), &if_entry.condition)
+                    } else {
+                        if_entry.condition.clone()
+                    };
+                    self.collect_items(&if_entry.entries, depth, parent_id, items, Some(&combined_condition));
                 }
                 Entry::MainMenu(_title) => {
                     // Skip mainmenu for now
@@ -289,6 +321,16 @@ impl ConfigState {
                     // Source entries are handled during parsing
                 }
             }
+        }
+    }
+    
+    /// Combine two expressions with AND logic
+    /// If existing_depends is None, returns new_condition
+    /// If existing_depends is Some, returns (existing_depends AND new_condition)
+    fn combine_conditions(existing_depends: Option<&Expr>, new_condition: &Expr) -> Expr {
+        match existing_depends {
+            None => new_condition.clone(),
+            Some(existing) => Expr::And(Box::new(existing.clone()), Box::new(new_condition.clone())),
         }
     }
     

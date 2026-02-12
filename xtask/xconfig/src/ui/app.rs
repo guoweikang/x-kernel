@@ -51,8 +51,8 @@ pub enum DialogType {
 }
 
 pub struct MenuConfigApp {
-    config_state: ConfigState,
-    symbol_table: SymbolTable,
+    pub config_state: ConfigState,
+    pub symbol_table: SymbolTable,
     navigation: NavigationState,
     dependency_resolver: DependencyResolver,
     
@@ -187,7 +187,7 @@ impl MenuConfigApp {
     /// Filter menu items based on visibility rules:
     /// 1. Items without prompts are hidden (internal variables)
     /// 2. Items with unsatisfied depends_on conditions are hidden
-    fn filter_visible_items(&self, items: Vec<MenuItem>) -> Vec<MenuItem> {
+    pub fn filter_visible_items(&self, items: Vec<MenuItem>) -> Vec<MenuItem> {
         use crate::ui::dependency_resolver::ExprEvaluator;
         let evaluator = ExprEvaluator::new();
         
