@@ -7,22 +7,17 @@
 #![no_std]
 #[macro_use]
 extern crate kplat;
+
+#[cfg(feature = "SMP")]
+complile_error!("aarch64-qemu-virt platform does not support SMP.");
+
 mod boot;
 mod init;
 mod mem;
 mod power;
-pub mod config {
-    platconfig_macros::include_configs!(
-        path_env = "PLAT_CONFIG_PATH",
-        fallback = "platconfig.toml"
-    );
-    // assert_eq!(
-    // PACKAGE,
-    // env!("CARGO_PKG_NAME"),
-    // "`PACKAGE` field in the configuration does not match the Package name. Please check your \
-    // configuration file."
-    // );
-}
+
+pub mod config;
+
 aarch64_peripherals::console_if_impl!(ConsoleImpl);
 aarch64_peripherals::time_if_impl!(GlobalTimerImpl);
 aarch64_peripherals::irq_if_impl!(IntrManagerImpl);

@@ -144,7 +144,7 @@ klogger = { path = "util/klogger" }
 backtrace = { path = "util/backtrace" }
 kerrno = { path = "util/kerrno" }
 unittest = { path = "util/unittest" }
-kbuild-config = { path = "util/kbuild_config" }
+kbuild_config = { path = "util/kbuild_config" }
 
 kconfig-gen = { path = "xtask/kconfig-gen" }
 smoltcp = { version = "0.12.0", package = "x-smoltcp", default-features = false }

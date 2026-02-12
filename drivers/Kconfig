@@ -1,0 +1,11 @@
+menu "Drivers Basic Configuration"
+
+config RTC
+    bool "RTC Support"
+    default y
+    help
+      Enable support for Real Time Clock (RTC) devices.
+
+
+endmenu
+

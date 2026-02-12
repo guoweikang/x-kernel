@@ -1,0 +1,29 @@
+#
+# Automatically generated file; DO NOT EDIT.
+# Rust Kbuild Configuration
+#
+FP_SIMD=y
+NET=y
+# LOG_LEVEL_ERROR is not set
+PLATFORM_AARCH64_QEMU_VIRT=y
+CPU_NUM=4
+# LOG_LEVEL_DEBUG is not set
+# BUILD_TYPE_DEBUG is not set
+LOG_LEVEL_WARN=y
+# ARCH_X86_64 is not set
+FS=y
+IRQ=y
+RTC=y
+# LOG_LEVEL_TRACE is not set
+# PLATFORM_AARCH64_CROSVM_VIRT is not set
+# PLATFORM_AARCH64_RASPI is not set
+# PLATFORM_X86_CSV is not set
+ARCH_AARCH64=y
+# PLATFORM_LOONGARCH64_QEMU_VIRT is not set
+SMP=y
+# LOG_LEVEL_INFO is not set
+# ARCH_LOONGARCH64 is not set
+# PLATFORM_X86_64_QEMU_VIRT is not set
+# ARCH_RISCV64 is not set
+BUILD_TYPE_RELEASE=y
+# PLATFORM_RISCV64_QEMU_VIRT is not set

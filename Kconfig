@@ -1,0 +1,167 @@
+mainmenu "X-kernel Configuration"
+
+choice
+    prompt "Build Type"
+    default BUILD_TYPE_RELEASE
+
+config BUILD_TYPE_RELEASE
+    bool "Release Build"
+    help
+      A release build with optimizations enabled and debug information disabled.
+config BUILD_TYPE_DEBUG
+    bool "Debug Build"
+    help
+        A debug build with optimizations disabled and debug information enabled.
+endchoice
+
+choice
+    prompt "LOG Level"
+    default LOG_LEVEL_WARN
+
+config LOG_LEVEL_ERROR
+    bool "Error Level Logging"
+
+config LOG_LEVEL_WARN
+    bool "Warning Level Logging"
+
+config LOG_LEVEL_INFO
+    bool "Info Level Logging"
+
+config LOG_LEVEL_DEBUG
+    bool "Debug Level Logging"
+
+config LOG_LEVEL_TRACE
+    bool "Trace Level Logging"
+
+endchoice
+
+choice
+    prompt "Target Architecture"
+    default ARCH_AARCH64
+
+config ARCH_AARCH64
+    bool "AArch64 (ARM 64-bit)"
+
+config ARCH_RISCV64
+    bool "RISC-V 64-bit"
+
+config ARCH_X86_64
+    bool "x86_64"
+
+config ARCH_LOONGARCH64
+    bool "LoongArch 64-bit"
+
+endchoice
+
+config ARCH_NAME
+    string
+    default "$(if $(ARCH_AARCH64),aarch64,$(if $(ARCH_RISCV64),riscv64,$(if $(ARCH_X86_64),x86_64,$(if $(ARCH_LOONGARCH64),loongarch64,unknown)))) )"
+    help
+      The name of the selected architecture.
+
+menu "Platform Selection"
+
+if ARCH_AARCH64
+
+choice
+    prompt "AArch64 Platform"
+    default PLATFORM_AARCH64_QEMU_VIRT
+
+config PLATFORM_AARCH64_QEMU_VIRT
+    bool "QEMU ARM64 Virtual Machine"
+
+config PLATFORM_AARCH64_CROSVM_VIRT
+    bool "CROSVM ARM64 Virtual Machine"
+
+config PLATFORM_AARCH64_RASPI
+    bool "Raspberry Pi 4B"
+
+endchoice
+
+config PLATFORM_NAME
+    string
+    default "$(if $(PLATFORM_AARCH64_QEMU_VIRT),aarch64-qemu-virt,$(if $(PLATFORM_AARCH64_CROSVM_VIRT),aarch64-crosvm-virt,$(if $(PLATFORM_AARCH64_RASPI),raspi4b,unknown))))"
+
+endif # ARCH_AARCH64
+
+if ARCH_RISCV64
+
+choice
+    prompt "RISC-V 64 Platform"
+    default PLATFORM_RISCV64_QEMU_VIRT
+
+config PLATFORM_RISCV64_QEMU_VIRT
+    bool "QEMU RISC-V 64 Virtual Machine"
+
+endchoice
+
+endif # ARCH_RISCV64
+
+if ARCH_X86_64
+
+choice
+    prompt "x86_64 Platform"
+    default PLATFORM_X86_64_QEMU_VIRT
+
+config PLATFORM_X86_64_QEMU_VIRT
+    bool "QEMU x86_64 Virtual Machine"
+
+config PLATFORM_X86_CSV
+    bool "x86 CSV Platform"
+
+endchoice
+
+endif # ARCH_X86_64
+
+if ARCH_LOONGARCH64
+
+choice
+    prompt "LoongArch64 Platform"
+    default PLATFORM_LOONGARCH64_QEMU_VIRT
+
+config PLATFORM_LOONGARCH64_QEMU_VIRT
+    bool "QEMU LoongArch64 Virtual Machine"
+
+endchoice
+
+endif # ARCH_LOONGARCH64
+
+endmenu
+
+menu "Kernel Features"
+
+config KERNEL_BASE_PADDR
+    hex "Kernel Base Physical Address"
+    default 0x80000000
+    help
+      Specify the base physical address where the kernel is loaded.
+
+config CPU_NUM
+    int "Number of CPUs"
+    default 4
+    help
+      Specify the number of CPUs to simulate in the kernel.
+
+config SMP
+    bool "Symmetric Multiprocessing (SMP)"
+    default y
+
+config FP_SIMD
+    bool "Floating Point and SIMD"
+    default y
+
+config NET
+    bool "Network Stack"
+    default y
+
+config FS
+    bool "File System Support"
+    default y
+
+config IRQ
+    bool "Interrupt Support"
+    default y
+
+endmenu
+
+source "drivers/Kconfig"

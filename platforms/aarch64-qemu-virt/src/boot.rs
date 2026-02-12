@@ -32,7 +32,7 @@ unsafe fn init_boot_page_table() {
     }
 }
 unsafe fn enable_fp() {
-    #[cfg(feature = "fp-simd")]
+    #[cfg(FP_SIMD)]
     kcpu::instrs::enable_fp();
 }
 #[unsafe(naked)]
@@ -89,7 +89,7 @@ unsafe extern "C" fn _start_primary() -> ! {
         entry = sym kplat::entry,
     )
 }
-#[cfg(feature = "smp")]
+#[cfg(SMP)]
 #[unsafe(naked)]
 pub(crate) unsafe extern "C" fn _start_secondary() -> ! {
     core::arch::naked_asm!("

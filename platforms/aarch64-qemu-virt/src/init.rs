@@ -20,11 +20,11 @@ impl BootHandler for BootHandlerImpl {
         aarch64_peripherals::pl011::early_init(p2v(pa!(UART_PADDR)));
         aarch64_peripherals::psci::init(PSCI_METHOD);
         aarch64_peripherals::generic_timer::early_init();
-        #[cfg(feature = "rtc")]
+        #[cfg(RTC)]
         aarch64_peripherals::pl031::early_init(p2v(pa!(RTC_PADDR)));
     }
 
-    #[cfg(feature = "smp")]
+    #[cfg(SMP)]
     fn early_init_ap(_cpu_id: usize) {
         kcpu::boot::init_trap();
     }
@@ -35,7 +35,7 @@ impl BootHandler for BootHandlerImpl {
         aarch64_peripherals::generic_timer::enable_local(TIMER_IRQ);
     }
 
-    #[cfg(feature = "smp")]
+    #[cfg(SMP)]
     fn final_init_ap(_cpu_id: usize) {
         aarch64_peripherals::gic::init_gicc();
         aarch64_peripherals::generic_timer::enable_local(TIMER_IRQ);
