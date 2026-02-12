@@ -67,16 +67,38 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbol_t
         match entry {
             Entry::Config(config) => {
                 symbol_table.add_symbol(config.name.clone(), config.symbol_type.clone());
-                // Set default if specified
-                if let Some(default_expr) = &config.properties.default {
-                    if let crate::kconfig::Expr::Const(val) = default_expr {
-                        symbol_table.set_value(&config.name, val.clone());
-                    } else if let crate::kconfig::Expr::ShellExpr(shell_expr) = default_expr {
-                        // Evaluate shell expression for default
-                        if let Ok(value) = crate::kconfig::shell_expr::evaluate_shell_expr(shell_expr, symbol_table) {
-                            if !value.is_empty() {
-                                symbol_table.set_value(&config.name, value);
+                
+                // Evaluate conditional defaults
+                for (default_value, condition) in &config.properties.defaults {
+                    let should_apply = if let Some(cond) = condition {
+                        // Evaluate the condition
+                        crate::kconfig::expr::evaluate_expr(cond, &symbol_table).unwrap_or(false)
+                    } else {
+                        // Unconditional default (always apply if no previous default matched)
+                        true
+                    };
+                    
+                    if should_apply {
+                        // Apply this default and stop checking further defaults
+                        let mut applied = false;
+                        if let crate::kconfig::Expr::Const(val) = default_value {
+                            symbol_table.set_value(&config.name, val.clone());
+                            applied = true;
+                        } else if let crate::kconfig::Expr::Symbol(sym) = default_value {
+                            symbol_table.set_value(&config.name, sym.clone());
+                            applied = true;
+                        } else if let crate::kconfig::Expr::ShellExpr(shell_expr) = default_value {
+                            // Evaluate shell expression for default
+                            if let Ok(value) = crate::kconfig::shell_expr::evaluate_shell_expr(shell_expr, &symbol_table) {
+                                if !value.is_empty() {
+                                    symbol_table.set_value(&config.name, value);
+                                    applied = true;
+                                }
                             }
+                        }
+                        
+                        if applied {
+                            break;  // Stop at first matching default that was successfully applied
                         }
                     }
                 }

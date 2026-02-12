@@ -331,7 +331,17 @@ impl Parser {
                 }
                 Token::Default => {
                     self.advance()?;
-                    properties.default = Some(self.parse_expr()?);
+                    let value = self.parse_expr()?;
+                    
+                    // Check for optional 'if' condition
+                    let condition = if matches!(self.current_context().current_token, Token::If) {
+                        self.advance()?;  // consume 'if'
+                        Some(self.parse_expr()?)
+                    } else {
+                        None
+                    };
+                    
+                    properties.defaults.push((value, condition));
                 }
                 Token::Depends => {
                     self.advance()?;

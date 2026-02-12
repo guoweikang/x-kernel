@@ -28,7 +28,7 @@ pub enum Expr {
 #[derive(Debug, Clone)]
 pub struct Property {
     pub prompt: Option<String>,
-    pub default: Option<Expr>,
+    pub defaults: Vec<(Expr, Option<Expr>)>,  // (value, optional condition)
     pub depends: Option<Expr>,
     pub select: Vec<(String, Option<Expr>)>,
     pub imply: Vec<(String, Option<Expr>)>,
@@ -40,7 +40,7 @@ impl Default for Property {
     fn default() -> Self {
         Self {
             prompt: None,
-            default: None,
+            defaults: Vec::new(),
             depends: None,
             select: Vec::new(),
             imply: Vec::new(),

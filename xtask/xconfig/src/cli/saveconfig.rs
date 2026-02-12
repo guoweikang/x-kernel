@@ -50,23 +50,44 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols:
                 let clean_name = config.name.strip_prefix("CONFIG_").unwrap_or(&config.name);
                 symbols.add_symbol(clean_name.to_string(), config.symbol_type.clone());
                 
-                // Apply default value if present
-                if let Some(default_expr) = &config.properties.default {
-                    if let Expr::Const(val) = default_expr {
-                        symbols.set_value(clean_name, val.clone());
-                    } else if let Expr::Symbol(sym) = default_expr {
-                        // Handle default values like 'y' or 'n'
-                        symbols.set_value(clean_name, sym.clone());
-                    } else if let Expr::ShellExpr(shell_expr) = default_expr {
-                        // Evaluate shell expression
-                        if let Ok(value) = crate::kconfig::shell_expr::evaluate_shell_expr(shell_expr, symbols) {
-                            if !value.is_empty() {
-                                symbols.set_value(clean_name, value);
+                // Evaluate conditional defaults
+                let mut default_applied = false;
+                for (default_value, condition) in &config.properties.defaults {
+                    let should_apply = if let Some(cond) = condition {
+                        // Evaluate the condition
+                        crate::kconfig::expr::evaluate_expr(cond, symbols).unwrap_or(false)
+                    } else {
+                        // Unconditional default (always apply if no previous default matched)
+                        true
+                    };
+                    
+                    if should_apply {
+                        // Apply this default and stop checking further defaults
+                        if let Expr::Const(val) = default_value {
+                            symbols.set_value(clean_name, val.clone());
+                            default_applied = true;
+                        } else if let Expr::Symbol(sym) = default_value {
+                            // Handle default values like 'y' or 'n'
+                            symbols.set_value(clean_name, sym.clone());
+                            default_applied = true;
+                        } else if let Expr::ShellExpr(shell_expr) = default_value {
+                            // Evaluate shell expression
+                            if let Ok(value) = crate::kconfig::shell_expr::evaluate_shell_expr(shell_expr, symbols) {
+                                if !value.is_empty() {
+                                    symbols.set_value(clean_name, value);
+                                    default_applied = true;
+                                }
                             }
                         }
+                        
+                        if default_applied {
+                            break;  // Stop at first matching default that was successfully applied
+                        }
                     }
-                } else {
-                    // Set to 'n' if no default
+                }
+                
+                // If no default was applied, set to 'n' for bool/tristate
+                if !default_applied {
                     match config.symbol_type {
                         crate::kconfig::ast::SymbolType::Bool | 
                         crate::kconfig::ast::SymbolType::Tristate => {
