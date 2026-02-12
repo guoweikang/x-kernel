@@ -443,20 +443,64 @@ fn apply_kbuild_config(
     
     // Add extra arguments
     cargo_args.extend_from_slice(extra_args);
+
     
-    println!("🚀 Running: cargo {}\n", cargo_args.join(" "));
+    // Extract top-level cargo options like -C that must come before the subcommand
+    let mut top_level_args: Vec<String> = Vec::new();
+    let mut subcommand_args: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < cargo_args.len() {
+        if i == 0 {
+            // First element is the subcommand (build, test, etc.)
+            subcommand_args.push(cargo_args[i].clone());
+            i += 1;
+            continue;
+        }
+        
+        // Check for -C option (directory change)
+        if cargo_args[i] == "-C" && i + 1 < cargo_args.len() {
+            top_level_args.push(cargo_args[i].clone());
+            top_level_args.push(cargo_args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        
+        // Check for -Z option (unstable features)
+        if cargo_args[i] == "-Z" && i + 1 < cargo_args.len() {
+            top_level_args.push(cargo_args[i].clone());
+            top_level_args.push(cargo_args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        
+        // All other args go after the subcommand
+        subcommand_args.push(cargo_args[i].clone());
+        i += 1;
+    }
     
-    // Set RUSTFLAGS to enable config values as cfg flags and declare them for check-cfg
-    let mut rustflags = String::new();
+    // Rebuild cargo_args with proper order: top_level_args, subcommand, subcommand_args
+    let mut final_cargo_args: Vec<String> = Vec::new();
+    final_cargo_args.extend(top_level_args);
+    final_cargo_args.extend(subcommand_args);
     
+    println!("🚀 Running: cargo {}\n", final_cargo_args.join(" "));
+
+    let mut rustflags = env::var("RUSTFLAGS").unwrap_or_default();
+
+    println!("🔍 [DEBUG] Original RUSTFLAGS from env: {}", rustflags);
+
+    if !rustflags.is_empty() && !rustflags.ends_with(' ') {
+        rustflags.push(' ');
+    }
+
     // Add check-cfg declarations for all config options from .config
     for config_name in all_configs.iter() {
-        if !rustflags.is_empty() {
+        if !rustflags.is_empty() && !rustflags.ends_with(' ') {
             rustflags.push(' ');
         }
         rustflags.push_str(&format!("--check-cfg=cfg({})", config_name));
     }
-    
+
     // Add --cfg flags for ALL enabled configs from .config (not just features)
     for (key, value) in &config {
         if value == "y" || value == "m" {
@@ -466,22 +510,23 @@ fn apply_kbuild_config(
             rustflags.push_str(&format!("--cfg {}", key));
         }
     }
-    
+
     let mut cmd = process::Command::new("cargo");
-    cmd.args(&cargo_args);
+    cmd.args(&final_cargo_args);
     cmd.current_dir(workspace_root);
-    
+
     if !rustflags.is_empty() {
+        println!("🔍 [DEBUG] Final RUSTFLAGS passed to cargo: {}", rustflags);
         cmd.env("RUSTFLAGS", rustflags);
     }
-    
+
     let status = cmd.status()
         .map_err(|e| format!("Failed to run cargo: {}", e))?;
-    
+
     if !status.success() {
         return Err(format!("cargo {} failed", cargo_cmd));
     }
-    
+
     println!("\n✅ Command completed successfully!");
     Ok(())
 }
