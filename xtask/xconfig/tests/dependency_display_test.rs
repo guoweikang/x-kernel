@@ -84,7 +84,7 @@ fn test_menu_tree_dependencies() {
     let config_state = ConfigState::build_from_entries(&ast.entries);
     
     // Get items from the kernel menu
-    let menu_id = "menu_Kernel Configuration";
+    let menu_id = "menu_Kernel_Configuration";
     let kernel_items = config_state.menu_tree.get(menu_id);
     
     assert!(kernel_items.is_some(), "Kernel Configuration menu should exist");

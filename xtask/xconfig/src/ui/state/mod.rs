@@ -2,12 +2,72 @@ use crate::kconfig::ast::{Entry, Menu, Config, MenuConfig, Choice, Comment};
 use crate::kconfig::{SymbolType, Expr};
 use std::collections::HashMap;
 use std::sync::OnceLock;
+use std::io::Write;
+
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 
 // Helper function to check if debug logging is enabled
 // Cached to avoid repeated environment lookups
 fn is_debug_enabled() -> bool {
     static DEBUG_ENABLED: OnceLock<bool> = OnceLock::new();
     *DEBUG_ENABLED.get_or_init(|| std::env::var("XCONFIG_DEBUG").is_ok())
+}
+
+// Get debug log file handle (lazily opened)
+fn debug_log_file() -> Option<&'static std::sync::Mutex<std::fs::File>> {
+    static DEBUG_FILE: OnceLock<Option<std::sync::Mutex<std::fs::File>>> = OnceLock::new();
+    DEBUG_FILE.get_or_init(|| {
+        if !is_debug_enabled() {
+            return None;
+        }
+        
+        // Allow configuration via environment variable, otherwise use a secure default
+        let log_path = std::env::var("XCONFIG_DEBUG_LOG")
+            .unwrap_or_else(|_| {
+                // Try user-specific path first, fall back to /tmp with process ID
+                if let Ok(home) = std::env::var("HOME") {
+                    format!("{}/.xconfig_debug.log", home)
+                } else {
+                    format!("/tmp/xconfig_debug_{}.log", std::process::id())
+                }
+            });
+        
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true).write(true).truncate(true);
+        
+        // Set restrictive permissions on Unix-like systems
+        #[cfg(unix)]
+        options.mode(0o600); // Only owner can read/write
+        
+        match options.open(&log_path) {
+            Ok(file) => Some(std::sync::Mutex::new(file)),
+            Err(e) => {
+                // Log error to stderr only if debug is explicitly enabled
+                eprintln!("Warning: Failed to open debug log at '{}': {}", log_path, e);
+                None
+            }
+        }
+    }).as_ref()
+}
+
+// Helper macro for debug logging to file
+macro_rules! debug_log {
+    ($($arg:tt)*) => {
+        if is_debug_enabled() {
+            if let Some(file_mutex) = debug_log_file() {
+                if let Ok(mut file) = file_mutex.lock() {
+                    let _ = writeln!(file, $($arg)*);
+                }
+            }
+        }
+    };
+}
+
+// Helper function to normalize menu/comment IDs by replacing spaces with underscores
+// This ensures consistent ID format and prevents issues with space-containing keys
+fn normalize_id(prefix: &str, text: &str) -> String {
+    format!("{}_{}", prefix, text.replace(' ', "_"))
 }
 
 #[derive(Debug, Clone)]
@@ -104,7 +164,7 @@ impl MenuItem {
     
     pub fn from_menu(menu: &Menu, depth: usize) -> Self {
         Self {
-            id: format!("menu_{}", menu.title),
+            id: normalize_id("menu", &menu.title),
             kind: MenuItemKind::Menu {
                 title: menu.title.clone(),
             },
@@ -151,7 +211,7 @@ impl MenuItem {
     
     pub fn from_comment(comment: &Comment, depth: usize) -> Self {
         Self {
-            id: format!("comment_{}", comment.text),
+            id: normalize_id("comment", &comment.text),
             kind: MenuItemKind::Comment {
                 text: comment.text.clone(),
             },
@@ -222,37 +282,33 @@ impl ConfigState {
     fn process_entries(&mut self, entries: &[Entry], depth: usize, parent_id: &str) {
         let mut items = Vec::new();
         
-        if is_debug_enabled() {
-            eprintln!("🔹 process_entries: parent_id='{}', depth={}, entries_count={}", 
-                      parent_id, depth, entries.len());
-        }
+        debug_log!("[MenuTree] Building: parent_id=\"{}\", depth={}, entries_count={}", 
+                   parent_id, depth, entries.len());
         
         // Process entries and collect them into items
         self.collect_items(entries, depth, parent_id, &mut items, None);
         
-        if is_debug_enabled() {
-            eprintln!("🔹 Inserting into menu_tree: key='{}', items_count={}", 
-                      parent_id, items.len());
-            for (i, item) in items.iter().enumerate() {
-                eprintln!("    [{}] id='{}', label='{}', kind={:?}", i, item.id, item.label, 
-                         match &item.kind {
-                             MenuItemKind::Menu { .. } => "Menu",
-                             MenuItemKind::Config { .. } => "Config",
-                             MenuItemKind::MenuConfig { .. } => "MenuConfig",
-                             MenuItemKind::Choice { .. } => "Choice",
-                             MenuItemKind::Comment { .. } => "Comment",
-                         });
-            }
-            
-            if self.menu_tree.contains_key(parent_id) {
-                let existing_items = &self.menu_tree[parent_id];
-                eprintln!("⚠️  WARNING: Overwriting menu_tree key: '{}'", parent_id);
-                eprintln!("    Existing {} items will be replaced with {} new items", 
-                         existing_items.len(), items.len());
-                if !existing_items.is_empty() {
-                    eprintln!("    First existing item: id='{}', label='{}'", 
-                             existing_items[0].id, existing_items[0].label);
-                }
+        debug_log!("[MenuTree] Inserting into menu_tree: key=\"{}\", items_count={}", 
+                   parent_id, items.len());
+        for (i, item) in items.iter().enumerate() {
+            debug_log!("    [{}] id=\"{}\", label=\"{}\", kind={:?}", i, item.id, item.label, 
+                      match &item.kind {
+                          MenuItemKind::Menu { .. } => "Menu",
+                          MenuItemKind::Config { .. } => "Config",
+                          MenuItemKind::MenuConfig { .. } => "MenuConfig",
+                          MenuItemKind::Choice { .. } => "Choice",
+                          MenuItemKind::Comment { .. } => "Comment",
+                      });
+        }
+        
+        if self.menu_tree.contains_key(parent_id) {
+            let existing_items = &self.menu_tree[parent_id];
+            debug_log!("⚠️  WARNING: Overwriting menu_tree key: \"{}\"", parent_id);
+            debug_log!("    Existing {} items will be replaced with {} new items", 
+                      existing_items.len(), items.len());
+            if !existing_items.is_empty() {
+                debug_log!("    First existing item: id=\"{}\", label=\"{}\"", 
+                          existing_items[0].id, existing_items[0].label);
             }
         }
         
@@ -270,6 +326,9 @@ impl ConfigState {
     /// The `if_condition` parameter is used to propagate if-block conditions to items inside them,
     /// combining with their existing depends_on expressions.
     fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>, if_condition: Option<&Expr>) {
+        debug_log!("[MenuTree] collect_items: parent_id=\"{}\", depth={}, entries_count={}, if_condition={}", 
+                   parent_id, depth, entries.len(), if_condition.is_some());
+        
         for entry in entries {
             match entry {
                 Entry::Config(config) => {
@@ -380,26 +439,20 @@ impl ConfigState {
             path.last().unwrap().clone()
         };
         
-        if is_debug_enabled() {
-            eprintln!("🔍 get_items_for_path: key='{}', path={:?}", key, path);
-        }
+        debug_log!("[MenuTree] get_items_for_path: key=\"{}\", path={:?}", key, path);
         
         let items = self.menu_tree.get(&key).cloned().unwrap_or_else(|| {
-            if is_debug_enabled() {
-                eprintln!("❌ Key not found in menu_tree: '{}'", key);
-                eprintln!("Available keys: {:?}", self.menu_tree.keys().collect::<Vec<_>>());
-            }
+            debug_log!("❌ Key not found in menu_tree: \"{}\"", key);
+            debug_log!("Available keys: {:?}", self.menu_tree.keys().collect::<Vec<_>>());
             Vec::new()
         });
         
-        if is_debug_enabled() {
-            eprintln!("📋 Returning {} items for key '{}'", items.len(), key);
-            for item in items.iter().take(3) {
-                eprintln!("    - {}: {}", item.id, item.label);
-            }
-            if items.len() > 3 {
-                eprintln!("    ... and {} more items", items.len() - 3);
-            }
+        debug_log!("📋 Returning {} items for key \"{}\"", items.len(), key);
+        for item in items.iter().take(3) {
+            debug_log!("    - {}: {}", item.id, item.label);
+        }
+        if items.len() > 3 {
+            debug_log!("    ... and {} more items", items.len() - 3);
         }
         
         items

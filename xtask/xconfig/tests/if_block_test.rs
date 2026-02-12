@@ -72,7 +72,7 @@ endmenu
     assert!(all_item_ids.contains(&"ARCH_RISCV64".to_string()), "Should contain ARCH_RISCV64");
     
     // Should contain the menu
-    assert!(all_item_ids.contains(&"menu_Platform Selection".to_string()), "Should contain Platform Selection menu");
+    assert!(all_item_ids.contains(&"menu_Platform_Selection".to_string()), "Should contain Platform Selection menu");
     
     // CRITICAL: Should contain the platform choice that's inside the if block
     // We check for the specific platform configs which are unique to the if block
@@ -86,7 +86,7 @@ endmenu
             "Should contain PLATFORM_RISCV_QEMU from inside if ARCH_RISCV64 block");
     
     // Verify menu tree structure - the Platform Selection menu should contain items from if blocks
-    let platform_menu_items = config_state.menu_tree.get("menu_Platform Selection");
+    let platform_menu_items = config_state.menu_tree.get("menu_Platform_Selection");
     assert!(platform_menu_items.is_some(), "Platform Selection menu should exist in menu_tree");
     
     let platform_items = platform_menu_items.unwrap();
@@ -140,7 +140,7 @@ endif
     let all_item_ids: Vec<String> = config_state.all_items.iter().map(|i| i.id.clone()).collect();
     
     assert!(all_item_ids.contains(&"FEATURE_A".to_string()), "Should contain FEATURE_A");
-    assert!(all_item_ids.contains(&"menu_Feature A Options".to_string()), 
+    assert!(all_item_ids.contains(&"menu_Feature_A_Options".to_string()), 
             "Should contain menu from inside if block");
     assert!(all_item_ids.contains(&"OPTION_1".to_string()), 
             "Should contain OPTION_1 from menu inside if block");
