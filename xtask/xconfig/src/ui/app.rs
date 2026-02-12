@@ -1659,6 +1659,7 @@ impl MenuConfigApp {
         match expr {
             Expr::Symbol(s) => s.clone(),
             Expr::Const(c) => c.clone(),
+            Expr::ShellExpr(e) => format!("shell({})", e),
             Expr::Not(e) => format!("!{}", Self::format_expr(e)),
             Expr::And(left, right) => {
                 format!("{} && {}", Self::format_expr(left), Self::format_expr(right))

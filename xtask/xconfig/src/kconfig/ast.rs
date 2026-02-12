@@ -13,6 +13,7 @@ pub enum SymbolType {
 pub enum Expr {
     Symbol(String),
     Const(String),
+    ShellExpr(String),
     Not(Box<Expr>),
     And(Box<Expr>, Box<Expr>),
     Or(Box<Expr>, Box<Expr>),

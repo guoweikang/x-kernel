@@ -606,7 +606,12 @@ impl Parser {
             Token::StringLit(val) => {
                 let val = val.clone();
                 self.advance()?;
-                Ok(Expr::Const(val))
+                // Check if it contains shell expressions
+                if val.contains("$(") {
+                    Ok(Expr::ShellExpr(val))
+                } else {
+                    Ok(Expr::Const(val))
+                }
             }
             Token::Number(n) => {
                 let n = *n;

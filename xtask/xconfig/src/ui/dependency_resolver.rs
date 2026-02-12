@@ -256,6 +256,7 @@ impl DependencyResolver {
         match expr {
             Expr::Symbol(s) => s.clone(),
             Expr::Const(c) => c.clone(),
+            Expr::ShellExpr(e) => format!("shell({})", e),
             Expr::Not(inner) => format!("!{}", self.format_expr(inner)),
             Expr::And(left, right) => format!("({} && {})", self.format_expr(left), self.format_expr(right)),
             Expr::Or(left, right) => format!("({} || {})", self.format_expr(left), self.format_expr(right)),
