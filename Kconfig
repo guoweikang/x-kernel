@@ -53,7 +53,7 @@ config ARCH_LOONGARCH64
 
 endchoice
 
-config ARCH_NAME
+config ARCH
     string
     default "$(if $(ARCH_AARCH64),aarch64,$(if $(ARCH_RISCV64),riscv64,$(if $(ARCH_X86_64),x86_64,$(if $(ARCH_LOONGARCH64),loongarch64,unknown)))) )"
     help
@@ -76,11 +76,12 @@ config PLATFORM_AARCH64_CROSVM_VIRT
 config PLATFORM_AARCH64_RASPI
     bool "Raspberry Pi 4B"
 
-endchoice
-
-config PLATFORM_NAME
+config PLATFORM
     string
     default "$(if $(PLATFORM_AARCH64_QEMU_VIRT),aarch64-qemu-virt,$(if $(PLATFORM_AARCH64_CROSVM_VIRT),aarch64-crosvm-virt,$(if $(PLATFORM_AARCH64_RASPI),raspi4b,unknown))))"
+
+
+endchoice
 
 endif # ARCH_AARCH64
 
@@ -93,6 +94,9 @@ choice
 config PLATFORM_RISCV64_QEMU_VIRT
     bool "QEMU RISC-V 64 Virtual Machine"
 
+config PLATFORM
+    string
+    default "$(if $(PLATFORM_RISCV64_QEMU_VIRT),riscv64-qemu-virt,unknown)"
 endchoice
 
 endif # ARCH_RISCV64
@@ -109,6 +113,10 @@ config PLATFORM_X86_64_QEMU_VIRT
 config PLATFORM_X86_CSV
     bool "x86 CSV Platform"
 
+config PLATFORM
+    string
+    default "$(if $(PLATFORM_X86_64_QEMU_VIRT),x86_64-qemu-virt,$(if $(PLATFORM_X86_CSV),x86-csv,unknown))"
+
 endchoice
 
 endif # ARCH_X86_64
@@ -121,6 +129,10 @@ choice
 
 config PLATFORM_LOONGARCH64_QEMU_VIRT
     bool "QEMU LoongArch64 Virtual Machine"
+
+config PLATFORM
+    string
+    default "$(if $(PLATFORM_LOONGARCH64_QEMU_VIRT),loongarch64-qemu-virt,unknown)"
 
 endchoice
 

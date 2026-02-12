@@ -138,7 +138,6 @@ rsext4 = { path = "fs/rsext4", default-features = false }
 # util Crates
 macros = { path = "util/macros" }
 kinit_setup = { path = "util/kinit_setup" }
-platconfig = { path = "util/platconfig" }
 platconfig-macros = { path = "util/platconfig-macros" }
 klogger = { path = "util/klogger" }
 backtrace = { path = "util/backtrace" }

@@ -10,7 +10,6 @@ repository.workspace = true
 
 [dependencies]
 backtrace.workspace = true
-platconfig.workspace = true
 kerrno.workspace = true
 kfeat.workspace = true
 fs-ng-vfs.workspace = true
