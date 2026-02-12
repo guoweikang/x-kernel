@@ -66,9 +66,9 @@ impl Property {
         for default in &self.defaults {
             // Check condition (if any)
             if let Some(ref condition) = default.condition {
-                match evaluate_expr(condition, symbol_table) {
-                    Ok(true) => {}, // Condition met, continue
-                    _ => continue,   // Skip this default
+                // Skip this default if condition is not met
+                if !matches!(evaluate_expr(condition, symbol_table), Ok(true)) {
+                    continue;
                 }
             }
             
