@@ -425,6 +425,39 @@ config NET_PORT
 endif # NET_SUPPORT
 ```
 
+## 🐛 Debugging
+
+### Enable Debug Logging
+
+Set the `XCONFIG_DEBUG` environment variable to enable detailed debug logging for menu tree operations:
+
+```bash
+XCONFIG_DEBUG=1 xconf menuconfig
+```
+
+**Debug output includes:**
+- `process_entries` calls with parent_id, depth, and entry count
+- Menu tree insertions with all items being inserted
+- Key overwrite warnings (if any duplicate keys are detected)
+- `get_items_for_path` lookups showing which items are returned for each navigation
+
+**Example debug output:**
+```
+🔹 process_entries: parent_id='menu_Platform Selection', depth=1, entries_count=5
+🔹 Inserting into menu_tree: key='menu_Platform Selection', items_count=12
+    [0] id='choice_PLATFORM_AARCH64_QEMU_VIRT', label='AArch64 Platform', kind="Choice"
+    [1] id='PLATFORM_AARCH64_QEMU_VIRT', label='QEMU ARM64 Virtual Machine', kind="Config"
+    ...
+🔍 get_items_for_path: key='menu_Platform Selection', path=["menu_Platform Selection"]
+📋 Returning 12 items for key 'menu_Platform Selection'
+```
+
+**Use cases:**
+- Debugging menu navigation issues
+- Verifying correct menu tree structure
+- Identifying configuration parsing problems
+- Troubleshooting menu content misalignment
+
 ## 🔧 Development
 
 ### Building
