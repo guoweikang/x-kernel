@@ -1,10 +1,13 @@
 use crate::kconfig::ast::{Entry, Menu, Config, MenuConfig, Choice, Comment};
 use crate::kconfig::{SymbolType, Expr};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 // Helper function to check if debug logging is enabled
+// Cached to avoid repeated environment lookups
 fn is_debug_enabled() -> bool {
-    std::env::var("XCONFIG_DEBUG").is_ok()
+    static DEBUG_ENABLED: OnceLock<bool> = OnceLock::new();
+    *DEBUG_ENABLED.get_or_init(|| std::env::var("XCONFIG_DEBUG").is_ok())
 }
 
 #[derive(Debug, Clone)]
@@ -242,7 +245,14 @@ impl ConfigState {
             }
             
             if self.menu_tree.contains_key(parent_id) {
+                let existing_items = &self.menu_tree[parent_id];
                 eprintln!("⚠️  WARNING: Overwriting menu_tree key: '{}'", parent_id);
+                eprintln!("    Existing {} items will be replaced with {} new items", 
+                         existing_items.len(), items.len());
+                if !existing_items.is_empty() {
+                    eprintln!("    First existing item: id='{}', label='{}'", 
+                             existing_items[0].id, existing_items[0].label);
+                }
             }
         }
         

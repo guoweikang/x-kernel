@@ -45,17 +45,17 @@ fn test_menu_content_alignment() {
     let platform_items = config_state.get_items_for_path(&[platform_menu.id.clone()]);
     assert!(!platform_items.is_empty(), "Platform Selection menu should have items");
     
-    // Check that Platform Selection contains platform-related items (choices)
+    // Check that Platform Selection contains platform-related items (using IDs not labels)
     let has_platform_choices = platform_items.iter().any(|item| {
-        item.label.contains("Platform") || 
-        item.label.contains("QEMU") || 
-        item.label.contains("AArch64") ||
-        item.label.contains("RISC-V") ||
-        item.label.contains("x86_64") ||
-        item.label.contains("LoongArch")
+        // Check for specific platform config IDs
+        item.id.contains("PLATFORM_AARCH64") ||
+        item.id.contains("PLATFORM_RISCV64") ||
+        item.id.contains("PLATFORM_X86_64") ||
+        item.id.contains("PLATFORM_LOONGARCH64") ||
+        item.id == "PLATFORM"
     });
-    assert!(has_platform_choices, "Platform Selection should contain platform choices, but got: {:?}", 
-            platform_items.iter().map(|i| &i.label).collect::<Vec<_>>());
+    assert!(has_platform_choices, "Platform Selection should contain platform config items, but got: {:?}", 
+            platform_items.iter().map(|i| &i.id).collect::<Vec<_>>());
     
     // Find Kernel Features menu
     let kernel_menu = root_items.iter().find(|item| item.label == "Kernel Features");
