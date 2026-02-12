@@ -79,7 +79,10 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols:
                                 }
                             }
                         }
-                        break;  // Stop at first matching default
+                        
+                        if default_applied {
+                            break;  // Stop at first matching default that was successfully applied
+                        }
                     }
                 }
                 
