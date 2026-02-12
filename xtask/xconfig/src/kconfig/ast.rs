@@ -25,10 +25,17 @@ pub enum Expr {
     GreaterEqual(Box<Expr>, Box<Expr>),
 }
 
+/// Represents a default value with an optional condition
+#[derive(Debug, Clone)]
+pub struct DefaultValue {
+    pub value: Expr,
+    pub condition: Option<Expr>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Property {
     pub prompt: Option<String>,
-    pub defaults: Vec<(Expr, Option<Expr>)>,  // (value, optional condition)
+    pub defaults: Vec<DefaultValue>,
     pub depends: Option<Expr>,
     pub select: Vec<(String, Option<Expr>)>,
     pub imply: Vec<(String, Option<Expr>)>,
@@ -47,6 +54,43 @@ impl Default for Property {
             range: None,
             help: None,
         }
+    }
+}
+
+impl Property {
+    /// Evaluate conditional defaults in order and return the first matching value
+    pub fn evaluate_default(&self, symbol_table: &crate::kconfig::SymbolTable) -> Option<String> {
+        use crate::kconfig::expr::evaluate_expr;
+        use crate::kconfig::shell_expr::evaluate_shell_expr;
+        
+        for default in &self.defaults {
+            // Check condition (if any)
+            if let Some(ref condition) = default.condition {
+                match evaluate_expr(condition, symbol_table) {
+                    Ok(true) => {}, // Condition met, continue
+                    _ => continue,   // Skip this default
+                }
+            }
+            
+            // Evaluate the value expression
+            match &default.value {
+                Expr::Const(val) => return Some(val.clone()),
+                Expr::Symbol(sym) => {
+                    if let Some(value) = symbol_table.get_value(sym) {
+                        return Some(value);
+                    }
+                }
+                Expr::ShellExpr(shell) => {
+                    if let Ok(value) = evaluate_shell_expr(shell, symbol_table) {
+                        if !value.is_empty() {
+                            return Some(value);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
     }
 }
 

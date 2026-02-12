@@ -41,7 +41,6 @@ pub fn saveconfig_command(
 
 fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols: &mut crate::kconfig::SymbolTable) {
     use crate::kconfig::ast::Entry;
-    use crate::kconfig::Expr;
     
     for entry in entries {
         match entry {
@@ -50,44 +49,11 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols:
                 let clean_name = config.name.strip_prefix("CONFIG_").unwrap_or(&config.name);
                 symbols.add_symbol(clean_name.to_string(), config.symbol_type.clone());
                 
-                // Evaluate conditional defaults
-                let mut default_applied = false;
-                for (default_value, condition) in &config.properties.defaults {
-                    let should_apply = if let Some(cond) = condition {
-                        // Evaluate the condition
-                        crate::kconfig::expr::evaluate_expr(cond, symbols).unwrap_or(false)
-                    } else {
-                        // Unconditional default (always apply if no previous default matched)
-                        true
-                    };
-                    
-                    if should_apply {
-                        // Apply this default and stop checking further defaults
-                        if let Expr::Const(val) = default_value {
-                            symbols.set_value(clean_name, val.clone());
-                            default_applied = true;
-                        } else if let Expr::Symbol(sym) = default_value {
-                            // Handle default values like 'y' or 'n'
-                            symbols.set_value(clean_name, sym.clone());
-                            default_applied = true;
-                        } else if let Expr::ShellExpr(shell_expr) = default_value {
-                            // Evaluate shell expression
-                            if let Ok(value) = crate::kconfig::shell_expr::evaluate_shell_expr(shell_expr, symbols) {
-                                if !value.is_empty() {
-                                    symbols.set_value(clean_name, value);
-                                    default_applied = true;
-                                }
-                            }
-                        }
-                        
-                        if default_applied {
-                            break;  // Stop at first matching default that was successfully applied
-                        }
-                    }
-                }
-                
-                // If no default was applied, set to 'n' for bool/tristate
-                if !default_applied {
+                // Use the new evaluate_default method
+                if let Some(default_value) = config.properties.evaluate_default(symbols) {
+                    symbols.set_value(clean_name, default_value);
+                } else {
+                    // If no default was applied, set to 'n' for bool/tristate
                     match config.symbol_type {
                         crate::kconfig::ast::SymbolType::Bool | 
                         crate::kconfig::ast::SymbolType::Tristate => {
@@ -100,6 +66,20 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols:
             Entry::MenuConfig(menuconfig) => {
                 let clean_name = menuconfig.name.strip_prefix("CONFIG_").unwrap_or(&menuconfig.name);
                 symbols.add_symbol(clean_name.to_string(), menuconfig.symbol_type.clone());
+                
+                // Also evaluate defaults for menuconfig
+                if let Some(default_value) = menuconfig.properties.evaluate_default(symbols) {
+                    symbols.set_value(clean_name, default_value);
+                } else {
+                    // If no default was applied, set to 'n' for bool/tristate
+                    match menuconfig.symbol_type {
+                        crate::kconfig::ast::SymbolType::Bool | 
+                        crate::kconfig::ast::SymbolType::Tristate => {
+                            symbols.set_value(clean_name, "n".to_string());
+                        }
+                        _ => {}
+                    }
+                }
             }
             Entry::Choice(choice) => {
                 for option in &choice.options {
