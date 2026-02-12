@@ -22,3 +22,4 @@ crate_interface.workspace = true
 kspin.workspace = true
 log.workspace = true
 memaddr.workspace = true
+kbuild_config = { workspace = true }

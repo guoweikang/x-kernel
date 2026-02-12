@@ -10,7 +10,7 @@
 /// Platform-level configuration constants
 pub mod plat {
     pub const BOOT_STACK_SIZE: usize = 0x40000;
-    pub const CPU_NUM: usize = 4;
+    pub const CPU_NUM: usize = kbuild_config::CPU_NUM as _;
 
     pub const DMA_MEM_BASE: usize = 0x4000_0000;
     pub const DMA_MEM_SIZE: usize = 0x200_000;
@@ -19,9 +19,9 @@ pub mod plat {
     pub const KERNEL_ASPACE_SIZE: usize = 0x0000_ffff_ffff_f000;
 
     pub const KERNEL_BASE_PADDR: usize = kbuild_config::KERNEL_BASE_PADDR as _;
-    pub const KERNEL_BASE_VADDR: usize = 0xffff_0000_4020_0000;
+    pub const KERNEL_BASE_VADDR: usize = kbuild_config::KERNEL_BASE_VADDR as _;
+    pub const PHYS_BUS_OFFSET: usize = kbuild_config::PHYS_BUS_OFFSET as _;
 
-    pub const PHYS_BUS_OFFSET: usize = 0;
     pub const PHYS_MEMORY_BASE: usize = 0x4000_0000;
     pub const PHYS_MEMORY_SIZE: usize = 1073741824;
 
