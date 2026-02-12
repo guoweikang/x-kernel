@@ -64,7 +64,7 @@ endif
     let app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
     
     // Get root items and filter
-    let items = app.config_state.get_items_for_path(&[]);
+    let items = app.config_state().get_items_for_path(&[]);
     let visible = app.filter_visible_items(items);
     
     // Architecture choice should be visible
@@ -130,7 +130,7 @@ endif
     let app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
     
     // Get root items and filter
-    let items = app.config_state.get_items_for_path(&[]);
+    let items = app.config_state().get_items_for_path(&[]);
     let visible = app.filter_visible_items(items);
     
     // ARCH_AARCH64 should be visible
@@ -182,7 +182,7 @@ config HIDDEN_HEX
     let app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
     
     // Get root items and filter
-    let items = app.config_state.get_items_for_path(&[]);
+    let items = app.config_state().get_items_for_path(&[]);
     let visible = app.filter_visible_items(items);
     
     // VISIBLE_OPTION should appear (has prompt)
@@ -231,7 +231,7 @@ endmenu
     let app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
     
     // Get root items and filter
-    let items = app.config_state.get_items_for_path(&[]);
+    let items = app.config_state().get_items_for_path(&[]);
     let visible = app.filter_visible_items(items);
     
     // Menu should be visible
@@ -283,7 +283,7 @@ config ALWAYS_HIDDEN
     let app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
     
     // Get root items and filter
-    let items = app.config_state.get_items_for_path(&[]);
+    let items = app.config_state().get_items_for_path(&[]);
     let visible = app.filter_visible_items(items);
     
     // FEATURE_ENABLED should be visible (has prompt, no depends)
@@ -341,7 +341,7 @@ endchoice
     let app = MenuConfigApp::new(ast.entries, symbol_table).unwrap();
     
     // Get root items and filter
-    let items = app.config_state.get_items_for_path(&[]);
+    let items = app.config_state().get_items_for_path(&[]);
     let visible = app.filter_visible_items(items);
     
     // First choice with prompt should be visible

@@ -51,8 +51,8 @@ pub enum DialogType {
 }
 
 pub struct MenuConfigApp {
-    pub config_state: ConfigState,
-    pub symbol_table: SymbolTable,
+    config_state: ConfigState,
+    symbol_table: SymbolTable,
     navigation: NavigationState,
     dependency_resolver: DependencyResolver,
     
@@ -216,6 +216,11 @@ impl MenuConfigApp {
                 true
             })
             .collect()
+    }
+    
+    /// Get reference to config_state (for testing)
+    pub fn config_state(&self) -> &ConfigState {
+        &self.config_state
     }
     
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
