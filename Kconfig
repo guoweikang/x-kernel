@@ -70,15 +70,14 @@ choice
     prompt "AArch64 Platform"
     default PLATFORM_AARCH64_QEMU_VIRT
 
-config PLATFORM_AARCH64_QEMU_VIRT
-    bool "QEMU ARM64 Virtual Machine"
+    config PLATFORM_AARCH64_QEMU_VIRT
+        bool "QEMU ARM64 Virtual Machine"
 
-config PLATFORM_AARCH64_CROSVM_VIRT
-    bool "CROSVM ARM64 Virtual Machine"
+    config PLATFORM_AARCH64_CROSVM_VIRT
+        bool "CROSVM ARM64 Virtual Machine"
 
-config PLATFORM_AARCH64_RASPI
-    bool "Raspberry Pi 4B"
-
+    config PLATFORM_AARCH64_RASPI
+        bool "Raspberry Pi 4B"
 endchoice
 
 endif # ARCH_AARCH64
@@ -137,8 +136,7 @@ config PLATFORM
     help
       The name of the selected platform.
 
-
-endmenu
+endmenu # Platform Selection
 
 menu "Kernel Features"
 
