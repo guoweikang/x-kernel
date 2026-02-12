@@ -341,7 +341,7 @@ impl Parser {
                         None
                     };
                     
-                    properties.defaults.push((value, condition));
+                    properties.defaults.push(DefaultValue { value, condition });
                 }
                 Token::Depends => {
                     self.advance()?;

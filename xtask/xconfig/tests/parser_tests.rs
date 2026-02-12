@@ -79,32 +79,32 @@ fn test_parse_conditional_defaults() {
     assert_eq!(arch_config.properties.defaults.len(), 4);
 
     // Check first conditional default
-    let (value, condition) = &arch_config.properties.defaults[0];
-    assert!(matches!(value, Expr::Const(s) if s == "aarch64"));
-    assert!(condition.is_some());
-    if let Some(Expr::Symbol(sym)) = condition {
+    let default = &arch_config.properties.defaults[0];
+    assert!(matches!(&default.value, Expr::Const(s) if s == "aarch64"));
+    assert!(default.condition.is_some());
+    if let Some(Expr::Symbol(sym)) = &default.condition {
         assert_eq!(sym, "ARCH_AARCH64");
     } else {
         panic!("Expected Symbol condition");
     }
 
     // Check second conditional default
-    let (value, condition) = &arch_config.properties.defaults[1];
-    assert!(matches!(value, Expr::Const(s) if s == "riscv64"));
-    assert!(condition.is_some());
-    if let Some(Expr::Symbol(sym)) = condition {
+    let default = &arch_config.properties.defaults[1];
+    assert!(matches!(&default.value, Expr::Const(s) if s == "riscv64"));
+    assert!(default.condition.is_some());
+    if let Some(Expr::Symbol(sym)) = &default.condition {
         assert_eq!(sym, "ARCH_RISCV64");
     } else {
         panic!("Expected Symbol condition");
     }
 
     // Check third conditional default
-    let (value, condition) = &arch_config.properties.defaults[2];
-    assert!(matches!(value, Expr::Const(s) if s == "x86_64"));
-    assert!(condition.is_some());
+    let default = &arch_config.properties.defaults[2];
+    assert!(matches!(&default.value, Expr::Const(s) if s == "x86_64"));
+    assert!(default.condition.is_some());
 
     // Check fourth unconditional default (fallback)
-    let (value, condition) = &arch_config.properties.defaults[3];
-    assert!(matches!(value, Expr::Const(s) if s == "unknown"));
-    assert!(condition.is_none(), "Last default should be unconditional");
+    let default = &arch_config.properties.defaults[3];
+    assert!(matches!(&default.value, Expr::Const(s) if s == "unknown"));
+    assert!(default.condition.is_none(), "Last default should be unconditional");
 }
