@@ -363,16 +363,7 @@ impl MenuConfigApp {
     }
     
     fn render_menu_tree(&mut self, frame: &mut Frame, area: Rect) {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect()
-        } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
-        };
-        
-        // Apply visibility filtering
-        let visible_items = self.filter_visible_items(items);
+        let visible_items = self.get_visible_items();
         
         if visible_items.is_empty() {
             let empty = Paragraph::new("No items found")
@@ -462,16 +453,7 @@ impl MenuConfigApp {
     }
     
     fn render_detail_panel(&self, frame: &mut Frame, area: Rect) {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect()
-        } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
-        };
-        
-        // Apply visibility filtering
-        let visible_items = self.filter_visible_items(items);
+        let visible_items = self.get_visible_items();
         
         if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
             let empty = Paragraph::new("No item selected")
