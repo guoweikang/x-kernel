@@ -17,7 +17,7 @@ impl ConfigWriter {
 
         for (name, symbol) in symbols.all_symbols() {
             let clean_name = name.strip_prefix("CONFIG_").unwrap_or(name);
-            
+
             if let Some(value) = &symbol.value {
                 match value.as_str() {
                     "y" | "m" => {
@@ -31,14 +31,15 @@ impl ConfigWriter {
                         match symbol.symbol_type {
                             SymbolType::Hex => {
                                 // Hex: NO quotes, normalize to 0x format
-                                let normalized_hex = if value.starts_with("0x") || value.starts_with("0X") {
-                                    format!("0x{}", value[2..].to_lowercase())
-                                } else if let Ok(num) = value.parse::<u64>() {
-                                    format!("0x{:x}", num)
-                                } else {
-                                    // If parsing fails, use the value as-is
-                                    value.to_string()
-                                };
+                                let normalized_hex =
+                                    if value.starts_with("0x") || value.starts_with("0X") {
+                                        format!("0x{}", value[2..].to_lowercase())
+                                    } else if let Ok(num) = value.parse::<u64>() {
+                                        format!("0x{:x}", num)
+                                    } else {
+                                        // If parsing fails, use the value as-is
+                                        value.to_string()
+                                    };
                                 writeln!(file, "{}={}", clean_name, normalized_hex)?;
                             }
                             SymbolType::Int => {

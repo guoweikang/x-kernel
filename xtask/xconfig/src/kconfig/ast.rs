@@ -62,7 +62,7 @@ impl Property {
     pub fn evaluate_default(&self, symbol_table: &crate::kconfig::SymbolTable) -> Option<String> {
         use crate::kconfig::expr::evaluate_expr;
         use crate::kconfig::shell_expr::evaluate_shell_expr;
-        
+
         for default in &self.defaults {
             // Check condition (if any)
             if let Some(ref condition) = default.condition {
@@ -71,7 +71,7 @@ impl Property {
                     continue;
                 }
             }
-            
+
             // Evaluate the value expression
             match &default.value {
                 Expr::Const(val) => return Some(val.clone()),

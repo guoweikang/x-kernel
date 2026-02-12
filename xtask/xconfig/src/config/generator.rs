@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::Path;
 
 /// ConfigGenerator generates build system configuration files.
-/// 
+///
 /// Note: Modules (tristate 'm' values) are treated as 'y' in this implementation
 /// as the rust-kbuild project does not currently support loadable modules.
 /// This is a deviation from the Linux kernel Kconfig which generates separate
@@ -23,7 +23,7 @@ impl ConfigGenerator {
         for (name, symbol) in symbols.all_symbols() {
             // Strip CONFIG_ prefix if present
             let clean_name = name.strip_prefix("CONFIG_").unwrap_or(name);
-            
+
             if let Some(value) = &symbol.value {
                 if value != "n" {
                     writeln!(file, "{}={}", clean_name, value)?;
@@ -45,7 +45,7 @@ impl ConfigGenerator {
         for (name, symbol) in symbols.all_symbols() {
             // Strip CONFIG_ prefix if present
             let clean_name = name.strip_prefix("CONFIG_").unwrap_or(name);
-            
+
             if let Some(value) = &symbol.value {
                 match value.as_str() {
                     "y" => {

@@ -149,25 +149,32 @@ pub fn generate_command(config: PathBuf, kconfig: PathBuf, srctree: PathBuf) -> 
 
 pub fn run_cli() -> Result<()> {
     let cli = Cli::parse();
-    
+
     match cli.command {
-        Commands::Parse { kconfig, srctree } => {
-            parse_command(kconfig, srctree)
-        }
-        Commands::Defconfig { defconfig, kconfig, srctree } => {
-            crate::cli::defconfig::defconfig_command(defconfig, kconfig, srctree)
-        }
+        Commands::Parse { kconfig, srctree } => parse_command(kconfig, srctree),
+        Commands::Defconfig {
+            defconfig,
+            kconfig,
+            srctree,
+        } => crate::cli::defconfig::defconfig_command(defconfig, kconfig, srctree),
         Commands::Menuconfig { kconfig, srctree } => {
             crate::cli::menuconfig::menuconfig_command(kconfig, srctree)
         }
-        Commands::Generate { config, kconfig, srctree } => {
-            generate_command(config, kconfig, srctree)
-        }
-        Commands::Oldconfig { config, kconfig, srctree, auto_defaults } => {
-            crate::cli::oldconfig::oldconfig_command(config, kconfig, srctree, auto_defaults)
-        }
-        Commands::Saveconfig { output, kconfig, srctree } => {
-            crate::cli::saveconfig::saveconfig_command(output, kconfig, srctree)
-        }
+        Commands::Generate {
+            config,
+            kconfig,
+            srctree,
+        } => generate_command(config, kconfig, srctree),
+        Commands::Oldconfig {
+            config,
+            kconfig,
+            srctree,
+            auto_defaults,
+        } => crate::cli::oldconfig::oldconfig_command(config, kconfig, srctree, auto_defaults),
+        Commands::Saveconfig {
+            output,
+            kconfig,
+            srctree,
+        } => crate::cli::saveconfig::saveconfig_command(output, kconfig, srctree),
     }
 }

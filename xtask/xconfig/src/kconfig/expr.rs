@@ -1,7 +1,7 @@
 use crate::error::{KconfigError, Result};
 use crate::kconfig::ast::Expr;
-use crate::kconfig::symbol::SymbolTable;
 use crate::kconfig::shell_expr::evaluate_shell_expr;
+use crate::kconfig::symbol::SymbolTable;
 
 pub fn evaluate_expr(expr: &Expr, symbols: &SymbolTable) -> Result<bool> {
     match expr {
@@ -74,7 +74,7 @@ fn compare_values(left: &str, right: &str) -> Result<i32> {
     if let (Ok(l), Ok(r)) = (left.parse::<i64>(), right.parse::<i64>()) {
         return Ok((l - r).signum() as i32);
     }
-    
+
     // String comparison
     Ok(left.cmp(right) as i32)
 }

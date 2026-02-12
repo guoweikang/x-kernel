@@ -12,7 +12,7 @@ impl ConfigReader {
 
         for line in content.lines() {
             let line = line.trim();
-            
+
             // Skip empty lines
             if line.is_empty() {
                 continue;
@@ -38,13 +38,13 @@ impl ConfigReader {
             if let Some(pos) = line.find('=') {
                 let name = line[..pos].trim();
                 let value = line[pos + 1..].trim();
-                
+
                 // Remove quotes from string values
                 let value = value.trim_matches('"');
-                
+
                 // Strip CONFIG_ prefix if present for backward compatibility
                 let clean_name = name.strip_prefix("CONFIG_").unwrap_or(name);
-                
+
                 config.insert(clean_name.to_string(), value.to_string());
             }
         }

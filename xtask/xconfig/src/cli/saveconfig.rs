@@ -3,60 +3,65 @@ use crate::error::Result;
 use crate::kconfig::Parser;
 use std::path::PathBuf;
 
-pub fn saveconfig_command(
-    output: PathBuf,
-    kconfig: PathBuf,
-    srctree: PathBuf,
-) -> Result<()> {
+pub fn saveconfig_command(output: PathBuf, kconfig: PathBuf, srctree: PathBuf) -> Result<()> {
     println!("Saving configuration...");
     println!("Kconfig: {}", kconfig.display());
     println!("Output: {}", output.display());
-    
+
     // Parse Kconfig to get symbol definitions
     let mut parser = Parser::new(&kconfig, &srctree)?;
     let ast = parser.parse()?;
-    
+
     // Build symbol table from Kconfig
     let mut symbols = crate::kconfig::SymbolTable::new();
-    
+
     // Extract symbols from AST and apply defaults
     extract_symbols_from_entries(&ast.entries, &mut symbols);
-    
+
     // Write .config file
     ConfigWriter::write(&output, &symbols)?;
     println!("✅ Saved .config to {}", output.display());
-    
+
     // Generate auto.conf
-    let auto_conf = output.parent().unwrap_or(std::path::Path::new(".")).join("auto.conf");
+    let auto_conf = output
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("auto.conf");
     ConfigGenerator::generate_auto_conf(&auto_conf, &symbols)?;
     println!("✅ Generated {}", auto_conf.display());
-    
+
     // Generate autoconf.h
-    let autoconf_h = output.parent().unwrap_or(std::path::Path::new(".")).join("autoconf.h");
+    let autoconf_h = output
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("autoconf.h");
     ConfigGenerator::generate_autoconf_h(&autoconf_h, &symbols)?;
     println!("✅ Generated {}", autoconf_h.display());
-    
+
     Ok(())
 }
 
-fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols: &mut crate::kconfig::SymbolTable) {
+fn extract_symbols_from_entries(
+    entries: &[crate::kconfig::ast::Entry],
+    symbols: &mut crate::kconfig::SymbolTable,
+) {
     use crate::kconfig::ast::Entry;
-    
+
     for entry in entries {
         match entry {
             Entry::Config(config) => {
                 // Strip CONFIG_ prefix if present
                 let clean_name = config.name.strip_prefix("CONFIG_").unwrap_or(&config.name);
                 symbols.add_symbol(clean_name.to_string(), config.symbol_type.clone());
-                
+
                 // Use the new evaluate_default method
                 if let Some(default_value) = config.properties.evaluate_default(symbols) {
                     symbols.set_value(clean_name, default_value);
                 } else {
                     // If no default was applied, set to 'n' for bool/tristate
                     match config.symbol_type {
-                        crate::kconfig::ast::SymbolType::Bool | 
-                        crate::kconfig::ast::SymbolType::Tristate => {
+                        crate::kconfig::ast::SymbolType::Bool
+                        | crate::kconfig::ast::SymbolType::Tristate => {
                             symbols.set_value(clean_name, "n".to_string());
                         }
                         _ => {}
@@ -64,17 +69,20 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols:
                 }
             }
             Entry::MenuConfig(menuconfig) => {
-                let clean_name = menuconfig.name.strip_prefix("CONFIG_").unwrap_or(&menuconfig.name);
+                let clean_name = menuconfig
+                    .name
+                    .strip_prefix("CONFIG_")
+                    .unwrap_or(&menuconfig.name);
                 symbols.add_symbol(clean_name.to_string(), menuconfig.symbol_type.clone());
-                
+
                 // Also evaluate defaults for menuconfig
                 if let Some(default_value) = menuconfig.properties.evaluate_default(symbols) {
                     symbols.set_value(clean_name, default_value);
                 } else {
                     // If no default was applied, set to 'n' for bool/tristate
                     match menuconfig.symbol_type {
-                        crate::kconfig::ast::SymbolType::Bool | 
-                        crate::kconfig::ast::SymbolType::Tristate => {
+                        crate::kconfig::ast::SymbolType::Bool
+                        | crate::kconfig::ast::SymbolType::Tristate => {
                             symbols.set_value(clean_name, "n".to_string());
                         }
                         _ => {}
@@ -86,14 +94,18 @@ fn extract_symbols_from_entries(entries: &[crate::kconfig::ast::Entry], symbols:
                     let clean_name = option.name.strip_prefix("CONFIG_").unwrap_or(&option.name);
                     symbols.add_symbol(clean_name.to_string(), option.symbol_type.clone());
                 }
-                
+
                 // Apply choice default if specified
                 if let Some(default_name) = &choice.default {
-                    let clean_default = default_name.strip_prefix("CONFIG_").unwrap_or(default_name);
+                    let clean_default =
+                        default_name.strip_prefix("CONFIG_").unwrap_or(default_name);
                     symbols.set_value(clean_default, "y".to_string());
                 } else if let Some(first_option) = choice.options.first() {
                     // No default specified, select first option (standard Kconfig behavior)
-                    let clean_name = first_option.name.strip_prefix("CONFIG_").unwrap_or(&first_option.name);
+                    let clean_name = first_option
+                        .name
+                        .strip_prefix("CONFIG_")
+                        .unwrap_or(&first_option.name);
                     symbols.set_value(clean_name, "y".to_string());
                 }
             }

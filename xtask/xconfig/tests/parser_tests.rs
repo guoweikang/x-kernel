@@ -1,5 +1,5 @@
-use xconfig::kconfig::Parser;
 use std::path::PathBuf;
+use xconfig::kconfig::Parser;
 
 #[test]
 fn test_parse_basic_config() {
@@ -49,7 +49,7 @@ fn test_parse_example_project() {
 #[test]
 fn test_parse_conditional_defaults() {
     use xconfig::kconfig::ast::{Entry, Expr};
-    
+
     let kconfig_path = PathBuf::from("tests/fixtures/conditional_defaults/Kconfig");
     let srctree = PathBuf::from("tests/fixtures/conditional_defaults");
 
@@ -106,5 +106,8 @@ fn test_parse_conditional_defaults() {
     // Check fourth unconditional default (fallback)
     let default = &arch_config.properties.defaults[3];
     assert!(matches!(&default.value, Expr::Const(s) if s == "unknown"));
-    assert!(default.condition.is_none(), "Last default should be unconditional");
+    assert!(
+        default.condition.is_none(),
+        "Last default should be unconditional"
+    );
 }

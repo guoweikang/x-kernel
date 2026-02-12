@@ -1,5 +1,5 @@
-use xconfig::kconfig::Parser;
 use std::path::PathBuf;
+use xconfig::kconfig::Parser;
 
 #[test]
 fn test_source_recursion() {

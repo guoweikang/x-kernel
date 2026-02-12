@@ -25,35 +25,50 @@ config ARCH_RISCV64
 
 endchoice
 "#;
-    
+
     let mut temp_file = NamedTempFile::new().unwrap();
     write!(temp_file, "{}", kconfig_content).unwrap();
     let kconfig_path = temp_file.path().to_path_buf();
     let srctree = kconfig_path.parent().unwrap();
-    
+
     // Parse the Kconfig
     let mut parser = Parser::new(&kconfig_path, &srctree.to_path_buf()).unwrap();
     let ast = parser.parse().unwrap();
-    
+
     // Build ConfigState
     let config_state = ConfigState::build_from_entries(&ast.entries);
-    
+
     // Find choice options
-    let arch_arm64 = config_state.all_items.iter()
+    let arch_arm64 = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "ARCH_ARM64")
         .expect("ARCH_ARM64 should exist");
-    let arch_x86_64 = config_state.all_items.iter()
+    let arch_x86_64 = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "ARCH_X86_64")
         .expect("ARCH_X86_64 should exist");
-    let arch_riscv64 = config_state.all_items.iter()
+    let arch_riscv64 = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "ARCH_RISCV64")
         .expect("ARCH_RISCV64 should exist");
-    
+
     // All choice options should have parent_choice set
-    assert!(arch_arm64.parent_choice.is_some(), "ARCH_ARM64 should have parent_choice set");
-    assert!(arch_x86_64.parent_choice.is_some(), "ARCH_X86_64 should have parent_choice set");
-    assert!(arch_riscv64.parent_choice.is_some(), "ARCH_RISCV64 should have parent_choice set");
-    
+    assert!(
+        arch_arm64.parent_choice.is_some(),
+        "ARCH_ARM64 should have parent_choice set"
+    );
+    assert!(
+        arch_x86_64.parent_choice.is_some(),
+        "ARCH_X86_64 should have parent_choice set"
+    );
+    assert!(
+        arch_riscv64.parent_choice.is_some(),
+        "ARCH_RISCV64 should have parent_choice set"
+    );
+
     // All should point to the same choice
     let choice_id = arch_arm64.parent_choice.as_ref().unwrap();
     assert_eq!(arch_x86_64.parent_choice.as_ref().unwrap(), choice_id);
@@ -80,36 +95,51 @@ config CHOICE_OPTION_B
     
 endchoice
 "#;
-    
+
     let mut temp_file = NamedTempFile::new().unwrap();
     write!(temp_file, "{}", kconfig_content).unwrap();
     let kconfig_path = temp_file.path().to_path_buf();
     let srctree = kconfig_path.parent().unwrap();
-    
+
     let mut parser = Parser::new(&kconfig_path, &srctree.to_path_buf()).unwrap();
     let ast = parser.parse().unwrap();
-    
+
     let config_state = ConfigState::build_from_entries(&ast.entries);
-    
+
     // Find standalone option
-    let standalone = config_state.all_items.iter()
+    let standalone = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "STANDALONE_OPTION")
         .expect("STANDALONE_OPTION should exist");
-    
+
     // Standalone option should NOT have parent_choice
-    assert!(standalone.parent_choice.is_none(), "Standalone config should not have parent_choice");
-    
+    assert!(
+        standalone.parent_choice.is_none(),
+        "Standalone config should not have parent_choice"
+    );
+
     // Find choice options
-    let option_a = config_state.all_items.iter()
+    let option_a = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "CHOICE_OPTION_A")
         .expect("CHOICE_OPTION_A should exist");
-    let option_b = config_state.all_items.iter()
+    let option_b = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "CHOICE_OPTION_B")
         .expect("CHOICE_OPTION_B should exist");
-    
+
     // Choice options should have parent_choice
-    assert!(option_a.parent_choice.is_some(), "CHOICE_OPTION_A should have parent_choice");
-    assert!(option_b.parent_choice.is_some(), "CHOICE_OPTION_B should have parent_choice");
+    assert!(
+        option_a.parent_choice.is_some(),
+        "CHOICE_OPTION_A should have parent_choice"
+    );
+    assert!(
+        option_b.parent_choice.is_some(),
+        "CHOICE_OPTION_B should have parent_choice"
+    );
 }
 
 /// Test that multiple separate choices have different parent_choice values
@@ -140,43 +170,54 @@ config SECOND_B
     
 endchoice
 "#;
-    
+
     let mut temp_file = NamedTempFile::new().unwrap();
     write!(temp_file, "{}", kconfig_content).unwrap();
     let kconfig_path = temp_file.path().to_path_buf();
     let srctree = kconfig_path.parent().unwrap();
-    
+
     let mut parser = Parser::new(&kconfig_path, &srctree.to_path_buf()).unwrap();
     let ast = parser.parse().unwrap();
-    
+
     let config_state = ConfigState::build_from_entries(&ast.entries);
-    
+
     // Find options from first choice
-    let first_a = config_state.all_items.iter()
+    let first_a = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "FIRST_A")
         .expect("FIRST_A should exist");
-    let first_b = config_state.all_items.iter()
+    let first_b = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "FIRST_B")
         .expect("FIRST_B should exist");
-    
+
     // Find options from second choice
-    let second_a = config_state.all_items.iter()
+    let second_a = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "SECOND_A")
         .expect("SECOND_A should exist");
-    let second_b = config_state.all_items.iter()
+    let second_b = config_state
+        .all_items
+        .iter()
         .find(|item| item.id == "SECOND_B")
         .expect("SECOND_B should exist");
-    
+
     // Get choice IDs
     let first_choice_id = first_a.parent_choice.as_ref().unwrap();
     let second_choice_id = second_a.parent_choice.as_ref().unwrap();
-    
+
     // First choice options should have the same parent
     assert_eq!(first_b.parent_choice.as_ref().unwrap(), first_choice_id);
-    
+
     // Second choice options should have the same parent
     assert_eq!(second_b.parent_choice.as_ref().unwrap(), second_choice_id);
-    
+
     // First and second choices should have different parents
-    assert_ne!(first_choice_id, second_choice_id, "Different choices should have different parent IDs");
+    assert_ne!(
+        first_choice_id, second_choice_id,
+        "Different choices should have different parent IDs"
+    );
 }

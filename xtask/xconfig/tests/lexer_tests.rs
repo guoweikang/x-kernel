@@ -1,5 +1,5 @@
-use xconfig::kconfig::{Lexer, Token};
 use std::path::PathBuf;
+use xconfig::kconfig::{Lexer, Token};
 
 #[test]
 fn test_lexer_keywords() {

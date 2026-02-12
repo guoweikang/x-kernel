@@ -1,21 +1,25 @@
 use crate::error::Result;
 use crate::kconfig::{Expr, SymbolTable, SymbolType};
-use crate::ui::dependency_resolver::{DependencyResolver, DependencyError};
+use crate::ui::dependency_resolver::{DependencyError, DependencyResolver};
 use crate::ui::events::EventResult;
 use crate::ui::rendering::Theme;
-use crate::ui::state::{ConfigState, ConfigValue, MenuItem, MenuItemKind, NavigationState, TristateValue};
+use crate::ui::state::{
+    ConfigState, ConfigValue, MenuItem, MenuItemKind, NavigationState, TristateValue,
+};
 use crate::ui::utils::FuzzySearcher;
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
+    Frame, Terminal,
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::time::Duration;
 
+use crate::debug_log;
+use std::io::Write;
 /// Maximum number of dependency violations to display in error dialog
 const MAX_DISPLAYED_VIOLATIONS: usize = 5;
 
@@ -31,8 +35,13 @@ pub enum DialogType {
     Help,
     Save,
     DependencyError(DependencyError),
-    CascadeWarning { symbol: String, affected: Vec<String> },
-    ImplySuggestion { implied: Vec<String> },
+    CascadeWarning {
+        symbol: String,
+        affected: Vec<String>,
+    },
+    ImplySuggestion {
+        implied: Vec<String>,
+    },
     EditString {
         symbol: String,
         current_value: String,
@@ -55,58 +64,67 @@ pub struct MenuConfigApp {
     symbol_table: SymbolTable,
     navigation: NavigationState,
     dependency_resolver: DependencyResolver,
-    
+
     // Search state
     search_active: bool,
     search_query: String,
-    
+
     // UI state
     focus: PanelFocus,
     dialog_type: Option<DialogType>,
-    
+
     // Theme
     theme: Theme,
-    
+
     // Status message
     status_message: Option<String>,
-    
+
     // Input state for editing
     input_buffer: String,
     input_cursor: usize,
 }
 
 impl MenuConfigApp {
-    pub fn new(entries: Vec<crate::kconfig::ast::Entry>, symbol_table: SymbolTable) -> Result<Self> {
+    pub fn new(
+        entries: Vec<crate::kconfig::ast::Entry>,
+        symbol_table: SymbolTable,
+    ) -> Result<Self> {
         // Build dependency maps
         let mut dependency_resolver = DependencyResolver::new();
         dependency_resolver.build_from_entries(&entries);
-        
+
         let mut config_state = ConfigState::build_from_entries(&entries);
-        
+
         // Initialize values from symbol table
         for item in &mut config_state.all_items {
-            if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
+            if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } =
+                &item.kind
+            {
                 let symbol_type = symbol_type.clone();
                 let had_value = Self::initialize_item_value(item, &symbol_type, &symbol_table);
                 // Store original value for tracking modifications
                 if had_value {
                     if let Some(value) = symbol_table.get_value(&item.id) {
-                        config_state.original_values.insert(item.id.clone(), value.clone());
+                        config_state
+                            .original_values
+                            .insert(item.id.clone(), value.clone());
                     }
                 }
             }
         }
-        
+
         // Also initialize values in menu_tree (critical fix for checkbox display)
         for (_, items) in config_state.menu_tree.iter_mut() {
             for item in items {
-                if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
+                if let MenuItemKind::Config { symbol_type }
+                | MenuItemKind::MenuConfig { symbol_type } = &item.kind
+                {
                     let symbol_type = symbol_type.clone();
                     Self::initialize_item_value(item, &symbol_type, &symbol_table);
                 }
             }
         }
-        
+
         Ok(Self {
             config_state,
             symbol_table,
@@ -122,20 +140,24 @@ impl MenuConfigApp {
             input_cursor: 0,
         })
     }
-    
+
     /// Initialize the value for a menu item from the symbol table or set a default value.
-    /// 
+    ///
     /// This method looks up the item's value in the symbol table and updates the item's value field.
     /// If no value is found in the symbol table, it sets a default value based on the symbol type.
-    /// 
+    ///
     /// # Arguments
     /// * `item` - The menu item to initialize
     /// * `symbol_type` - The type of the symbol (Bool, Tristate, String, Int, or Hex)
     /// * `symbol_table` - The symbol table containing configuration values
-    /// 
+    ///
     /// # Returns
     /// `true` if a value was found in the symbol table, `false` if a default was used
-    fn initialize_item_value(item: &mut MenuItem, symbol_type: &SymbolType, symbol_table: &SymbolTable) -> bool {
+    fn initialize_item_value(
+        item: &mut MenuItem,
+        symbol_type: &SymbolType,
+        symbol_table: &SymbolTable,
+    ) -> bool {
         if let Some(value) = symbol_table.get_value(&item.id) {
             item.value = Some(Self::parse_value(&value, symbol_type));
             true
@@ -152,7 +174,7 @@ impl MenuConfigApp {
             false
         }
     }
-    
+
     fn parse_value(value: &str, symbol_type: &SymbolType) -> ConfigValue {
         match symbol_type {
             SymbolType::Bool => ConfigValue::Bool(value == "y"),
@@ -166,7 +188,10 @@ impl MenuConfigApp {
             SymbolType::Hex => {
                 let trimmed = value.trim();
                 // If already in hex format, normalize to lowercase
-                if let Some(hex_part) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+                if let Some(hex_part) = trimmed
+                    .strip_prefix("0x")
+                    .or_else(|| trimmed.strip_prefix("0X"))
+                {
                     ConfigValue::Hex(format!("0x{}", hex_part.to_lowercase()))
                 } else {
                     // If it's a decimal integer, convert to hex
@@ -183,15 +208,16 @@ impl MenuConfigApp {
             }
         }
     }
-    
+
     /// Filter menu items based on visibility rules:
     /// 1. Items without prompts are hidden (internal variables)
     /// 2. Items with unsatisfied depends_on conditions are hidden
     pub fn filter_visible_items(&self, items: Vec<MenuItem>) -> Vec<MenuItem> {
         use crate::ui::dependency_resolver::ExprEvaluator;
         let evaluator = ExprEvaluator::new();
-        
-        items.into_iter()
+
+        items
+            .into_iter()
             .filter(|item| {
                 // Rule 1: Config/MenuConfig items without prompts are never shown
                 match &item.kind {
@@ -207,26 +233,26 @@ impl MenuConfigApp {
                     }
                     _ => {} // Menus and Comments are always visible if dependencies are met
                 }
-                
+
                 // Rule 2: Check depends_on condition
                 if let Some(depends_expr) = &item.depends_on {
                     return evaluator.evaluate(depends_expr, &self.symbol_table);
                 }
-                
+
                 true
             })
             .collect()
     }
-    
+
     /// Get reference to config_state (for testing)
     pub fn config_state(&self) -> &ConfigState {
         &self.config_state
     }
-    
+
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
             terminal.draw(|f| self.render(f))?;
-            
+
             if event::poll(Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
                     match self.handle_key(key)? {
@@ -236,32 +262,34 @@ impl MenuConfigApp {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn render(&mut self, frame: &mut Frame) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Header
-                Constraint::Length(3),  // Search bar
-                Constraint::Min(0),     // Main content
-                Constraint::Length(3),  // Status bar
+                Constraint::Length(3), // Header
+                Constraint::Length(3), // Search bar
+                Constraint::Min(0),    // Main content
+                Constraint::Length(3), // Status bar
             ])
             .split(frame.size());
-        
+
         self.render_header(frame, chunks[0]);
         self.render_search_bar(frame, chunks[1]);
         self.render_main_content(frame, chunks[2]);
         self.render_status_bar(frame, chunks[3]);
-        
+
         // Render dialogs
         if let Some(dialog) = &self.dialog_type {
             match dialog {
                 DialogType::Help => self.render_help_modal(frame),
                 DialogType::Save => self.render_save_dialog(frame),
-                DialogType::DependencyError(error) => self.render_dependency_error_dialog(frame, error),
+                DialogType::DependencyError(error) => {
+                    self.render_dependency_error_dialog(frame, error)
+                }
                 DialogType::CascadeWarning { symbol, affected } => {
                     self.render_cascade_warning_dialog(frame, symbol, affected)
                 }
@@ -298,7 +326,7 @@ impl MenuConfigApp {
             }
         }
     }
-    
+
     fn render_header(&self, frame: &mut Frame, area: Rect) {
         let modified_count = self.config_state.modified_symbols.len();
         let title = format!(
@@ -310,70 +338,72 @@ impl MenuConfigApp {
             },
             "  [S]ave [Q]uit "
         );
-        
+
         let header = Paragraph::new(title)
             .style(self.theme.get_info_style().add_modifier(Modifier::BOLD))
             .block(Block::default().borders(Borders::ALL));
-        
+
         frame.render_widget(header, area);
     }
-    
+
     fn render_search_bar(&self, frame: &mut Frame, area: Rect) {
         let search_text = if self.search_active {
             format!(" 🔍 Search: {}_", self.search_query)
         } else {
             " 🔍 Press / to search".to_string()
         };
-        
+
         let style = if self.search_active {
             self.theme.get_selected_style()
         } else {
             Style::default()
         };
-        
+
         let search = Paragraph::new(search_text)
             .style(style)
             .block(Block::default().borders(Borders::ALL));
-        
+
         frame.render_widget(search, area);
     }
-    
+
     fn render_main_content(&mut self, frame: &mut Frame, area: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
             .split(area);
-        
+
         self.render_menu_tree(frame, chunks[0]);
         self.render_detail_panel(frame, chunks[1]);
     }
-    
+
     fn render_menu_tree(&mut self, frame: &mut Frame, area: Rect) {
         let items = if self.search_active && !self.search_query.is_empty() {
             let searcher = FuzzySearcher::new(self.search_query.clone());
             let results = searcher.search(&self.config_state.all_items);
             results.into_iter().map(|r| r.item).collect()
         } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
+            self.config_state
+                .get_items_for_path(&self.navigation.current_path)
         };
-        
+
         // Apply visibility filtering
         let visible_items = self.filter_visible_items(items);
-        
+
         if visible_items.is_empty() {
-            let empty = Paragraph::new("No items found")
-                .block(Block::default()
+            let empty = Paragraph::new("No items found").block(
+                Block::default()
                     .borders(Borders::ALL)
-                    .title(" Configuration Menu "));
+                    .title(" Configuration Menu "),
+            );
             frame.render_widget(empty, area);
             return;
         }
-        
+
         // Ensure selected index is valid
         if self.navigation.selected_index >= visible_items.len() {
             self.navigation.selected_index = visible_items.len().saturating_sub(1);
         }
-        
+
         let list_items: Vec<ListItem> = visible_items
             .iter()
             .enumerate()
@@ -382,27 +412,28 @@ impl MenuConfigApp {
                 self.create_list_item(item, is_selected)
             })
             .collect();
-        
-        let list = List::new(list_items)
-            .block(Block::default()
+
+        let list = List::new(list_items).block(
+            Block::default()
                 .borders(Borders::ALL)
                 .title(" Configuration Menu ")
                 .border_style(if self.focus == PanelFocus::MenuTree {
                     self.theme.get_selected_style()
                 } else {
                     self.theme.get_border_style()
-                }));
-        
+                }),
+        );
+
         frame.render_widget(list, area);
     }
-    
+
     fn create_list_item(&self, item: &MenuItem, is_selected: bool) -> ListItem<'_> {
         let indent = "  ".repeat(item.depth);
         let icon = self.get_item_icon(item);
         let checkbox = self.get_checkbox_symbol(item);
         let label = &item.label;
         let value_display = self.format_value_display(item);
-        
+
         let style = if is_selected {
             self.theme.get_selected_style()
         } else if !item.is_enabled {
@@ -410,22 +441,29 @@ impl MenuConfigApp {
         } else {
             Style::default()
         };
-        
-        let text = format!("{}{} {} {} {}", indent, icon, checkbox, label, value_display);
+
+        let text = format!(
+            "{}{} {} {} {}",
+            indent, icon, checkbox, label, value_display
+        );
         ListItem::new(text).style(style)
     }
-    
+
     fn get_item_icon(&self, item: &MenuItem) -> &str {
         match &item.kind {
             MenuItemKind::Menu { .. } => {
-                if item.has_children { "📁" } else { "📂" }
+                if item.has_children {
+                    "📁"
+                } else {
+                    "📂"
+                }
             }
             MenuItemKind::Config { .. } | MenuItemKind::MenuConfig { .. } => "⚙️ ",
             MenuItemKind::Choice { .. } => "◉",
             MenuItemKind::Comment { .. } => "💬",
         }
     }
-    
+
     fn get_checkbox_symbol(&self, item: &MenuItem) -> &str {
         match &item.value {
             Some(ConfigValue::Bool(true)) => "[✓]",
@@ -437,7 +475,7 @@ impl MenuConfigApp {
             _ => "   ",
         }
     }
-    
+
     fn format_value_display(&self, item: &MenuItem) -> String {
         match &item.value {
             Some(ConfigValue::String(s)) if !s.is_empty() => format!("= \"{}\"", s),
@@ -446,39 +484,41 @@ impl MenuConfigApp {
             _ => String::new(),
         }
     }
-    
+
     fn render_detail_panel(&self, frame: &mut Frame, area: Rect) {
         let items = if self.search_active && !self.search_query.is_empty() {
             let searcher = FuzzySearcher::new(self.search_query.clone());
             let results = searcher.search(&self.config_state.all_items);
             results.into_iter().map(|r| r.item).collect()
         } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
+            self.config_state
+                .get_items_for_path(&self.navigation.current_path)
         };
-        
+
         // Apply visibility filtering
         let visible_items = self.filter_visible_items(items);
-        
+
         if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
-            let empty = Paragraph::new("No item selected")
-                .block(Block::default()
+            let empty = Paragraph::new("No item selected").block(
+                Block::default()
                     .borders(Borders::ALL)
-                    .title(" 📖 Help & Details "));
+                    .title(" 📖 Help & Details "),
+            );
             frame.render_widget(empty, area);
             return;
         }
-        
+
         let item = &visible_items[self.navigation.selected_index];
-        
+
         let mut text_lines = vec![];
-        
+
         // Title
         text_lines.push(Line::from(vec![
             Span::styled("📖 ", self.theme.get_info_style()),
             Span::styled(&item.label, Style::default().add_modifier(Modifier::BOLD)),
         ]));
         text_lines.push(Line::from(""));
-        
+
         // Type and ID
         let type_str = match &item.kind {
             MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } => {
@@ -491,7 +531,7 @@ impl MenuConfigApp {
         text_lines.push(Line::from(type_str));
         text_lines.push(Line::from(format!("ID: {}", item.id)));
         text_lines.push(Line::from(""));
-        
+
         // Current value
         if let Some(value) = &item.value {
             let value_str = match value {
@@ -507,7 +547,7 @@ impl MenuConfigApp {
             text_lines.push(Line::from(value_str));
             text_lines.push(Line::from(""));
         }
-        
+
         // Help text
         if let Some(help) = &item.help_text {
             text_lines.push(Line::from("Description:"));
@@ -518,7 +558,7 @@ impl MenuConfigApp {
             }
             text_lines.push(Line::from(""));
         }
-        
+
         // Dependencies
         if !item.selects.is_empty() {
             text_lines.push(Line::from("⚡ Enables:"));
@@ -527,14 +567,14 @@ impl MenuConfigApp {
             }
             text_lines.push(Line::from(""));
         }
-        
+
         // Depends on section
         if let Some(depends) = &item.depends_on {
             text_lines.push(Line::from("🔗 Depends on:"));
             text_lines.push(Line::from(format!("  {}", Self::format_expr(depends))));
             text_lines.push(Line::from(""));
         }
-        
+
         // Selected by section
         if !item.selected_by.is_empty() {
             text_lines.push(Line::from("⬆️  Selected by:"));
@@ -543,7 +583,7 @@ impl MenuConfigApp {
             }
             text_lines.push(Line::from(""));
         }
-        
+
         // Implied by section
         if !item.implied_by.is_empty() {
             text_lines.push(Line::from("💡 Implied by:"));
@@ -551,32 +591,31 @@ impl MenuConfigApp {
                 text_lines.push(Line::from(format!("  • {}", impl_by)));
             }
         }
-        
-        let detail = Paragraph::new(text_lines)
-            .wrap(Wrap { trim: true })
-            .block(Block::default()
+
+        let detail = Paragraph::new(text_lines).wrap(Wrap { trim: true }).block(
+            Block::default()
                 .borders(Borders::ALL)
-                .title(" 📖 Help & Details "));
-        
+                .title(" 📖 Help & Details "),
+        );
+
         frame.render_widget(detail, area);
     }
-    
+
     fn render_status_bar(&self, frame: &mut Frame, area: Rect) {
         let status_text = if let Some(msg) = &self.status_message {
             msg.clone()
         } else {
             " ↑↓:Navigate │ Space:Toggle │ Enter:Open │ /:Search │ ?:Help │ ESC:Back".to_string()
         };
-        
-        let status = Paragraph::new(status_text)
-            .block(Block::default().borders(Borders::ALL));
-        
+
+        let status = Paragraph::new(status_text).block(Block::default().borders(Borders::ALL));
+
         frame.render_widget(status, area);
     }
-    
+
     fn render_help_modal(&self, frame: &mut Frame) {
         let area = self.centered_rect(60, 70, frame.size());
-        
+
         let help_text = vec![
             "Keyboard Shortcuts",
             "══════════════════",
@@ -600,21 +639,22 @@ impl MenuConfigApp {
             "",
             "Press any key to close",
         ];
-        
+
         let text: Vec<Line> = help_text.into_iter().map(Line::from).collect();
-        
-        let help = Paragraph::new(text)
-            .block(Block::default()
+
+        let help = Paragraph::new(text).block(
+            Block::default()
                 .borders(Borders::ALL)
                 .title(" Help ")
-                .style(self.theme.get_info_style()));
-        
+                .style(self.theme.get_info_style()),
+        );
+
         frame.render_widget(help, area);
     }
-    
+
     fn render_save_dialog(&self, frame: &mut Frame) {
         let area = self.centered_rect(50, 30, frame.size());
-        
+
         let text = vec![
             "Save Configuration?",
             "",
@@ -624,18 +664,19 @@ impl MenuConfigApp {
             "  n - Quit without saving",
             "  ESC - Cancel",
         ];
-        
+
         let lines: Vec<Line> = text.into_iter().map(Line::from).collect();
-        
-        let dialog = Paragraph::new(lines)
-            .block(Block::default()
+
+        let dialog = Paragraph::new(lines).block(
+            Block::default()
                 .borders(Borders::ALL)
                 .title(" Confirm ")
-                .style(self.theme.get_warning_style()));
-        
+                .style(self.theme.get_warning_style()),
+        );
+
         frame.render_widget(dialog, area);
     }
-    
+
     fn centered_rect(&self, percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         let popup_layout = Layout::default()
             .direction(Direction::Vertical)
@@ -645,7 +686,7 @@ impl MenuConfigApp {
                 Constraint::Percentage((100 - percent_y) / 2),
             ])
             .split(r);
-        
+
         Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -655,8 +696,14 @@ impl MenuConfigApp {
             ])
             .split(popup_layout[1])[1]
     }
-    
+
     fn handle_key(&mut self, key: KeyEvent) -> Result<EventResult> {
+        debug_log!(
+            "⌨️  [handle_key] key={:?}, current_path={:?}",
+            key.code,
+            self.navigation.current_path
+        );
+
         // Handle dialogs first - check type without moving
         let has_dialog = self.dialog_type.is_some();
         if has_dialog {
@@ -666,21 +713,27 @@ impl MenuConfigApp {
                     Ok(EventResult::Continue)
                 }
                 Some(DialogType::Save) => self.handle_save_dialog_key(key),
-                Some(DialogType::DependencyError(_)) => self.handle_dependency_error_dialog_key(key),
-                Some(DialogType::CascadeWarning { .. }) => self.handle_cascade_warning_dialog_key(key),
-                Some(DialogType::ImplySuggestion { .. }) => self.handle_imply_suggestion_dialog_key(key),
+                Some(DialogType::DependencyError(_)) => {
+                    self.handle_dependency_error_dialog_key(key)
+                }
+                Some(DialogType::CascadeWarning { .. }) => {
+                    self.handle_cascade_warning_dialog_key(key)
+                }
+                Some(DialogType::ImplySuggestion { .. }) => {
+                    self.handle_imply_suggestion_dialog_key(key)
+                }
                 Some(DialogType::EditString { .. })
                 | Some(DialogType::EditInt { .. })
                 | Some(DialogType::EditHex { .. }) => self.handle_input_dialog_key(key),
                 None => Ok(EventResult::Continue),
             };
         }
-        
+
         // Handle search mode
         if self.search_active {
             return self.handle_search_key(key);
         }
-        
+
         // Main navigation
         match key.code {
             KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -744,7 +797,7 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn handle_save_dialog_key(&mut self, key: KeyEvent) -> Result<EventResult> {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -763,7 +816,7 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn handle_search_key(&mut self, key: KeyEvent) -> Result<EventResult> {
         match key.code {
             KeyCode::Esc => {
@@ -779,12 +832,12 @@ impl MenuConfigApp {
                 if !self.search_query.is_empty() {
                     let searcher = FuzzySearcher::new(self.search_query.clone());
                     let results = searcher.search(&self.config_state.all_items);
-                    
+
                     if !results.is_empty() && self.navigation.selected_index < results.len() {
                         let selected_item = &results[self.navigation.selected_index].item;
                         let item_label = selected_item.label.clone();
                         let item_id = selected_item.id.clone();
-                        
+
                         // Find the item's location in the menu tree
                         if let Some((path, index)) = self.find_item_location(&item_id) {
                             // Navigate to the item's location
@@ -796,7 +849,7 @@ impl MenuConfigApp {
                         }
                     }
                 }
-                
+
                 // Exit search mode and clear query only if navigation was successful or Enter was pressed with results
                 if navigated || !self.search_query.is_empty() {
                     self.search_active = false;
@@ -834,7 +887,7 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn handle_dependency_error_dialog_key(&mut self, key: KeyEvent) -> Result<EventResult> {
         match key.code {
             KeyCode::Esc => {
@@ -844,7 +897,7 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn handle_cascade_warning_dialog_key(&mut self, key: KeyEvent) -> Result<EventResult> {
         // Extract symbol before any mutable operations
         let symbol = if let Some(DialogType::CascadeWarning { symbol, .. }) = &self.dialog_type {
@@ -852,7 +905,7 @@ impl MenuConfigApp {
         } else {
             return Ok(EventResult::Continue);
         };
-        
+
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 // Proceed with disabling
@@ -871,7 +924,7 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn handle_imply_suggestion_dialog_key(&mut self, key: KeyEvent) -> Result<EventResult> {
         // Extract implied list before any mutable operations
         let implied = if let Some(DialogType::ImplySuggestion { implied }) = &self.dialog_type {
@@ -879,7 +932,7 @@ impl MenuConfigApp {
         } else {
             return Ok(EventResult::Continue);
         };
-        
+
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 // Enable implied symbols
@@ -899,7 +952,7 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn handle_input_dialog_key(&mut self, key: KeyEvent) -> Result<EventResult> {
         match key.code {
             KeyCode::Char(c) => {
@@ -918,7 +971,7 @@ impl MenuConfigApp {
                         return Ok(EventResult::Continue);
                     }
                 }
-                
+
                 self.input_buffer.insert(self.input_cursor, c);
                 self.input_cursor += 1;
                 Ok(EventResult::Continue)
@@ -970,117 +1023,179 @@ impl MenuConfigApp {
             _ => Ok(EventResult::Continue),
         }
     }
-    
+
     fn move_up(&mut self) {
         if self.navigation.selected_index > 0 {
             self.navigation.selected_index -= 1;
         }
     }
-    
+
     fn move_down(&mut self) {
         let items = if self.search_active && !self.search_query.is_empty() {
             let searcher = FuzzySearcher::new(self.search_query.clone());
             let results = searcher.search(&self.config_state.all_items);
             results.into_iter().map(|r| r.item).collect::<Vec<_>>()
         } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
+            self.config_state
+                .get_items_for_path(&self.navigation.current_path)
         };
-        
+
         if !items.is_empty() && self.navigation.selected_index < items.len() - 1 {
             self.navigation.selected_index += 1;
         }
     }
-    
+
     fn enter_submenu(&mut self) {
-        let items = self.config_state.get_items_for_path(&self.navigation.current_path);
-        if items.is_empty() || self.navigation.selected_index >= items.len() {
+        debug_log!(
+            "🚪 [START] enter_submenu called, current_path={:?}",
+            self.navigation.current_path
+        );
+        let items = self
+            .config_state
+            .get_items_for_path(&self.navigation.current_path);
+        debug_log!("    [1] get_items_for_path returned {} items", items.len());
+
+        // ✅ 应用可见性过滤
+        let visible_items = self.filter_visible_items(items);
+        debug_log!(
+            "    [2] After filtering: {} visible items",
+            visible_items.len()
+        );
+
+        if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
+            debug_log!(
+                "    ❌ [EARLY EXIT] visible_items.is_empty()={}, selected_index={}, visible_items.len()={}",
+                visible_items.is_empty(),
+                self.navigation.selected_index,
+                visible_items.len()
+            );
             return;
         }
-        
-        let item = &items[self.navigation.selected_index];
+
+        let item = &visible_items[self.navigation.selected_index];
+        debug_log!(
+            "    [3] Selected item: id='{}', label='{}', has_children={}",
+            item.id,
+            item.label,
+            item.has_children
+        );
+
+        debug_log!("🚪 Attempting to enter submenu:");
+        debug_log!("    item.id: '{}'", item.id);
+        debug_log!("    item.label: '{}'", item.label);
+        debug_log!("    item.has_children: {}", item.has_children);
+        debug_log!(
+            "    current_path before: {:?}",
+            self.navigation.current_path
+        );
+
         if item.has_children {
             self.navigation.current_path.push(item.id.clone());
+
+            debug_log!("    ✅ Entering submenu");
+            debug_log!("    current_path after: {:?}", self.navigation.current_path);
+
             self.navigation.selected_index = 0;
             self.navigation.scroll_offset = 0;
+
+            debug_log!("🚪 [END] enter_submenu finished");
+        } else {
+            debug_log!("    ❌ Item has no children, cannot enter submenu");
         }
     }
-    
+
     fn go_back(&mut self) {
+        debug_log!(
+            "⬅️ [go_back] Called, current_path before: {:?}",
+            self.navigation.current_path
+        );
         if !self.navigation.current_path.is_empty() {
             self.navigation.current_path.pop();
+            debug_log!(
+                "    ✅ Popped, current_path after: {:?}",
+                self.navigation.current_path
+            );
             self.navigation.selected_index = 0;
             self.navigation.scroll_offset = 0;
+        } else {
+            debug_log!("    ❌ Already at root, cannot go back");
         }
     }
-    
+
     fn page_up(&mut self) {
         self.navigation.selected_index = self.navigation.selected_index.saturating_sub(10);
     }
-    
+
     fn page_down(&mut self) {
         let items = if self.search_active && !self.search_query.is_empty() {
             let searcher = FuzzySearcher::new(self.search_query.clone());
             let results = searcher.search(&self.config_state.all_items);
             results.into_iter().map(|r| r.item).collect::<Vec<_>>()
         } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
+            self.config_state
+                .get_items_for_path(&self.navigation.current_path)
         };
-        
+
         // Apply visibility filtering
         let visible_items = self.filter_visible_items(items);
-        
+
         if !visible_items.is_empty() {
-            self.navigation.selected_index = (self.navigation.selected_index + 10).min(visible_items.len() - 1);
+            self.navigation.selected_index =
+                (self.navigation.selected_index + 10).min(visible_items.len() - 1);
         }
     }
-    
+
     fn jump_to_first(&mut self) {
         self.navigation.selected_index = 0;
     }
-    
+
     fn jump_to_last(&mut self) {
         let items = if self.search_active && !self.search_query.is_empty() {
             let searcher = FuzzySearcher::new(self.search_query.clone());
             let results = searcher.search(&self.config_state.all_items);
             results.into_iter().map(|r| r.item).collect::<Vec<_>>()
         } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
+            self.config_state
+                .get_items_for_path(&self.navigation.current_path)
         };
-        
+
         // Apply visibility filtering
         let visible_items = self.filter_visible_items(items);
-        
+
         if !visible_items.is_empty() {
             self.navigation.selected_index = visible_items.len() - 1;
         }
     }
-    
+
     fn toggle_current_item(&mut self) -> Result<()> {
         let items = if self.search_active && !self.search_query.is_empty() {
             let searcher = FuzzySearcher::new(self.search_query.clone());
             let results = searcher.search(&self.config_state.all_items);
             results.into_iter().map(|r| r.item).collect::<Vec<_>>()
         } else {
-            self.config_state.get_items_for_path(&self.navigation.current_path)
+            self.config_state
+                .get_items_for_path(&self.navigation.current_path)
         };
-        
+
         // Apply visibility filtering
         let visible_items = self.filter_visible_items(items);
-        
+
         if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
             return Ok(());
         }
-        
+
         let item = &visible_items[self.navigation.selected_index];
         let item_id = item.id.clone();
-        
+
         // Check if this is a choice option
         if let Some(parent_choice_id) = &item.parent_choice {
             return self.handle_choice_selection(parent_choice_id, &item_id);
         }
-        
+
         // Check if this is a string/int/hex config item that needs editing
-        if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
+        if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } =
+            &item.kind
+        {
             match symbol_type {
                 SymbolType::String => {
                     let current = match &item.value {
@@ -1132,7 +1247,7 @@ impl MenuConfigApp {
                 }
             }
         }
-        
+
         // Toggle value (for Bool/Tristate)
         let new_value = match &item.value {
             Some(ConfigValue::Bool(b)) => Some(ConfigValue::Bool(!b)),
@@ -1143,22 +1258,28 @@ impl MenuConfigApp {
             })),
             _ => None,
         };
-        
+
         if let Some(new_val) = new_value {
             let is_enabling = matches!(
                 new_val,
-                ConfigValue::Bool(true) | ConfigValue::Tristate(TristateValue::Yes | TristateValue::Module)
+                ConfigValue::Bool(true)
+                    | ConfigValue::Tristate(TristateValue::Yes | TristateValue::Module)
             );
-            
+
             if is_enabling {
                 // Check dependencies before enabling
-                match self.dependency_resolver.can_enable(&item_id, &self.symbol_table) {
+                match self
+                    .dependency_resolver
+                    .can_enable(&item_id, &self.symbol_table)
+                {
                     Ok(_) => {
                         // Apply the change
                         self.apply_value_change(&item_id, new_val.clone())?;
-                        
+
                         // Apply select cascade
-                        let selected = self.dependency_resolver.apply_selects(&item_id, &mut self.symbol_table);
+                        let selected = self
+                            .dependency_resolver
+                            .apply_selects(&item_id, &mut self.symbol_table);
                         if !selected.is_empty() {
                             self.status_message = Some(format!(
                                 " {} enabled (also enabled: {})",
@@ -1168,9 +1289,11 @@ impl MenuConfigApp {
                         } else {
                             self.status_message = Some(format!(" {} enabled", item_id));
                         }
-                        
+
                         // Check for implied symbols
-                        let implied = self.dependency_resolver.get_implied_symbols(&item_id, &self.symbol_table);
+                        let implied = self
+                            .dependency_resolver
+                            .get_implied_symbols(&item_id, &self.symbol_table);
                         if !implied.is_empty() {
                             // Show suggestion dialog
                             self.dialog_type = Some(DialogType::ImplySuggestion { implied });
@@ -1184,11 +1307,16 @@ impl MenuConfigApp {
                 }
             } else {
                 // Disabling
-                match self.dependency_resolver.can_disable(&item_id, &self.symbol_table) {
+                match self
+                    .dependency_resolver
+                    .can_disable(&item_id, &self.symbol_table)
+                {
                     Ok(_) => {
                         // Check what will be affected
-                        let affected = self.dependency_resolver.check_disable_cascade(&item_id, &self.symbol_table);
-                        
+                        let affected = self
+                            .dependency_resolver
+                            .check_disable_cascade(&item_id, &self.symbol_table);
+
                         if !affected.is_empty() {
                             // Warn user
                             self.dialog_type = Some(DialogType::CascadeWarning {
@@ -1206,17 +1334,17 @@ impl MenuConfigApp {
                     }
                 }
             }
-            
+
             // Force UI refresh
             self.sync_ui_state_from_symbol_table()?;
             self.update_enabled_states()?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Get all option IDs belonging to a choice.
-    /// 
+    ///
     /// Returns a vector of config option IDs that are children of the specified choice.
     /// Used by `handle_choice_selection` to implement mutual exclusion.
     fn get_choice_options(&self, choice_id: &str) -> Vec<String> {
@@ -1224,21 +1352,24 @@ impl MenuConfigApp {
             .all_items
             .iter()
             .filter(|item| {
-                item.parent_choice.as_ref().map(|pc| pc == choice_id).unwrap_or(false)
+                item.parent_choice
+                    .as_ref()
+                    .map(|pc| pc == choice_id)
+                    .unwrap_or(false)
             })
             .map(|item| item.id.clone())
             .collect()
     }
-    
+
     /// Handle choice selection with mutual exclusion.
-    /// 
+    ///
     /// This method enforces Kconfig's choice mutual exclusion semantics:
     /// when a user selects one option in a choice, all other options are automatically deselected.
-    /// 
+    ///
     /// # Arguments
     /// * `choice_id` - The ID of the parent choice
     /// * `selected_option` - The ID of the option being selected
-    /// 
+    ///
     /// # Behavior
     /// 1. Gets all options belonging to the choice
     /// 2. Disables all options except the selected one (mutual exclusion)
@@ -1247,33 +1378,27 @@ impl MenuConfigApp {
     fn handle_choice_selection(&mut self, choice_id: &str, selected_option: &str) -> Result<()> {
         // 1. Get all options in this choice
         let choice_options = self.get_choice_options(choice_id);
-        
+
         // 2. Disable all other options (mutual exclusion)
         for option_id in &choice_options {
             if option_id != selected_option {
-                self.apply_value_change(
-                    option_id,
-                    ConfigValue::Bool(false)
-                )?;
+                self.apply_value_change(option_id, ConfigValue::Bool(false))?;
             }
         }
-        
+
         // 3. Enable the selected option
-        self.apply_value_change(
-            selected_option,
-            ConfigValue::Bool(true)
-        )?;
-        
+        self.apply_value_change(selected_option, ConfigValue::Bool(true))?;
+
         // 4. Update UI state
         self.sync_ui_state_from_symbol_table()?;
         self.update_enabled_states()?;
-        
+
         // 5. Show status message
         self.status_message = Some(format!(" {} selected", selected_option));
-        
+
         Ok(())
     }
-    
+
     fn apply_value_change(&mut self, item_id: &str, new_val: ConfigValue) -> Result<()> {
         // Update symbol table
         let value_str = match new_val {
@@ -1286,90 +1411,102 @@ impl MenuConfigApp {
             ConfigValue::Int(i) => i.to_string(),
             ConfigValue::Hex(h) => h,
         };
-        
-        self.symbol_table.set_value_tracked(item_id, value_str.clone());
-        
+
+        self.symbol_table
+            .set_value_tracked(item_id, value_str.clone());
+
         // Track modification
         let original = self.config_state.original_values.get(item_id).cloned();
         if original.as_deref() != Some(value_str.as_str()) {
-            self.config_state.modified_symbols.insert(item_id.to_string(), value_str);
+            self.config_state
+                .modified_symbols
+                .insert(item_id.to_string(), value_str);
         } else {
             self.config_state.modified_symbols.remove(item_id);
         }
-        
+
         Ok(())
     }
-    
+
     /// Update enabled states based on dependencies
     fn update_enabled_states(&mut self) -> Result<()> {
         for item in &mut self.config_state.all_items {
             if let MenuItemKind::Config { .. } | MenuItemKind::MenuConfig { .. } = &item.kind {
                 // Check if dependencies are met
-                item.is_enabled = self.dependency_resolver
+                item.is_enabled = self
+                    .dependency_resolver
                     .can_enable(&item.id, &self.symbol_table)
                     .is_ok();
             }
         }
-        
+
         // Also update menu_tree
         for (_key, items) in self.config_state.menu_tree.iter_mut() {
             for item in items {
                 if let MenuItemKind::Config { .. } | MenuItemKind::MenuConfig { .. } = &item.kind {
-                    item.is_enabled = self.dependency_resolver
+                    item.is_enabled = self
+                        .dependency_resolver
                         .can_enable(&item.id, &self.symbol_table)
                         .is_ok();
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Synchronize UI state from symbol table
     /// This ensures the UI always shows current symbol values
     fn sync_ui_state_from_symbol_table(&mut self) -> Result<()> {
         // Update all_items
         for item in &mut self.config_state.all_items {
-            if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
+            if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } =
+                &item.kind
+            {
                 if let Some(value) = self.symbol_table.get_value(&item.id) {
                     item.value = Some(Self::parse_value(&value, symbol_type));
                 }
             }
         }
-        
+
         // Update menu_tree
         for (_key, items) in self.config_state.menu_tree.iter_mut() {
             for item in items {
-                if let MenuItemKind::Config { symbol_type } | MenuItemKind::MenuConfig { symbol_type } = &item.kind {
+                if let MenuItemKind::Config { symbol_type }
+                | MenuItemKind::MenuConfig { symbol_type } = &item.kind
+                {
                     if let Some(value) = self.symbol_table.get_value(&item.id) {
                         item.value = Some(Self::parse_value(&value, symbol_type));
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Audit all enabled symbols to ensure their dependencies are satisfied
     fn audit_all_dependencies(&self) -> Vec<String> {
         let mut violations = Vec::new();
-        
+
         for (symbol_name, _symbol) in self.symbol_table.all_symbols() {
             if self.symbol_table.is_enabled(symbol_name) {
-                if let Err(e) = self.dependency_resolver.can_enable(symbol_name, &self.symbol_table) {
+                if let Err(e) = self
+                    .dependency_resolver
+                    .can_enable(symbol_name, &self.symbol_table)
+                {
                     violations.push(format!("{}: {}", symbol_name, e));
                 }
             }
         }
-        
+
         violations
     }
-    
+
     fn save_config(&mut self) -> Result<()> {
         use crate::config::ConfigWriter;
         use std::path::Path;
-        
+
         // Audit before saving
         let violations = self.audit_all_dependencies();
         if !violations.is_empty() {
@@ -1377,9 +1514,14 @@ impl MenuConfigApp {
                 "Configuration has {} dependency violation{}:\n{}",
                 violations.len(),
                 if violations.len() == 1 { "" } else { "s" },
-                violations.iter().take(MAX_DISPLAYED_VIOLATIONS).cloned().collect::<Vec<_>>().join("\n")
+                violations
+                    .iter()
+                    .take(MAX_DISPLAYED_VIOLATIONS)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("\n")
             );
-            
+
             // Show first violation as the primary error
             if let Some(first_violation) = violations.first() {
                 let parts: Vec<&str> = first_violation.splitn(2, ": ").collect();
@@ -1388,44 +1530,46 @@ impl MenuConfigApp {
                 } else {
                     ("CONFIGURATION".to_string(), first_violation.clone())
                 };
-                
+
                 self.dialog_type = Some(DialogType::DependencyError(
                     DependencyError::ConditionNotMet {
                         symbol,
                         condition: condition_str,
-                    }
+                    },
                 ));
             } else {
                 self.dialog_type = Some(DialogType::DependencyError(
                     DependencyError::ConditionNotMet {
                         symbol: "CONFIGURATION".to_string(),
                         condition: message,
-                    }
+                    },
                 ));
             }
             self.focus = PanelFocus::Dialog;
             return Ok(());
         }
-        
+
         ConfigWriter::write(Path::new(".config"), &self.symbol_table)?;
-        
+
         // Clear modified symbols after save
         self.config_state.modified_symbols.clear();
-        
+
         // Update original values
         for (name, symbol) in self.symbol_table.all_symbols() {
             if let Some(value) = &symbol.value {
-                self.config_state.original_values.insert(name.clone(), value.clone());
+                self.config_state
+                    .original_values
+                    .insert(name.clone(), value.clone());
             }
         }
-        
+
         self.status_message = Some(" Configuration saved to .config".to_string());
         Ok(())
     }
-    
+
     fn render_dependency_error_dialog(&self, frame: &mut Frame, error: &DependencyError) {
         let area = self.centered_rect(60, 40, frame.size());
-        
+
         let message = match error {
             DependencyError::DependencyNotMet { symbol, required } => {
                 vec![
@@ -1462,68 +1606,71 @@ impl MenuConfigApp {
             }
             _ => vec![Line::from(format!("Error: {}", error))],
         };
-        
-        let dialog = Paragraph::new(message)
-            .block(Block::default()
+
+        let dialog = Paragraph::new(message).block(
+            Block::default()
                 .borders(Borders::ALL)
                 .title(" Dependency Error ")
-                .style(self.theme.get_warning_style()));
-        
+                .style(self.theme.get_warning_style()),
+        );
+
         frame.render_widget(dialog, area);
     }
-    
+
     fn render_cascade_warning_dialog(&self, frame: &mut Frame, symbol: &str, affected: &[String]) {
         let area = self.centered_rect(60, 50, frame.size());
-        
+
         let mut lines = vec![
             Line::from("⚠️  Cascade Warning"),
             Line::from(""),
             Line::from(format!("Disabling {} will also affect:", symbol)),
             Line::from(""),
         ];
-        
+
         for affected_symbol in affected {
             lines.push(Line::from(format!("  • {}", affected_symbol)));
         }
-        
+
         lines.push(Line::from(""));
         lines.push(Line::from("Continue? [Y/n/ESC]"));
-        
-        let dialog = Paragraph::new(lines)
-            .block(Block::default()
+
+        let dialog = Paragraph::new(lines).block(
+            Block::default()
                 .borders(Borders::ALL)
                 .title(" Warning ")
-                .style(self.theme.get_warning_style()));
-        
+                .style(self.theme.get_warning_style()),
+        );
+
         frame.render_widget(dialog, area);
     }
-    
+
     fn render_imply_suggestion_dialog(&self, frame: &mut Frame, implied: &[String]) {
         let area = self.centered_rect(60, 40, frame.size());
-        
+
         let mut lines = vec![
             Line::from("💡 Suggestion"),
             Line::from(""),
             Line::from("The following options are recommended:"),
             Line::from(""),
         ];
-        
+
         for symbol in implied {
             lines.push(Line::from(format!("  • {}", symbol)));
         }
-        
+
         lines.push(Line::from(""));
         lines.push(Line::from("Enable them? [Y/n/ESC]"));
-        
-        let dialog = Paragraph::new(lines)
-            .block(Block::default()
+
+        let dialog = Paragraph::new(lines).block(
+            Block::default()
                 .borders(Borders::ALL)
                 .title(" Suggestion ")
-                .style(self.theme.get_info_style()));
-        
+                .style(self.theme.get_info_style()),
+        );
+
         frame.render_widget(dialog, area);
     }
-    
+
     fn render_input_dialog(
         &self,
         frame: &mut Frame,
@@ -1537,12 +1684,11 @@ impl MenuConfigApp {
         let x = (frame.size().width.saturating_sub(dialog_width)) / 2;
         let y = (frame.size().height.saturating_sub(dialog_height)) / 2;
         let dialog_area = Rect::new(x, y, dialog_width, dialog_height);
-        
+
         // Clear background
-        let bg = Block::default()
-            .style(Style::default().bg(ratatui::style::Color::Black));
+        let bg = Block::default().style(Style::default().bg(ratatui::style::Color::Black));
         frame.render_widget(bg, frame.size());
-        
+
         // Dialog box
         let title = format!(" Edit {} ({}) ", prompt, type_name);
         let dialog_block = Block::default()
@@ -1550,29 +1696,29 @@ impl MenuConfigApp {
             .title(title)
             .border_style(Style::default().fg(ratatui::style::Color::Cyan));
         frame.render_widget(dialog_block, dialog_area);
-        
+
         // Content area with margin
         let inner_width = dialog_width.saturating_sub(4);
         let inner_height = dialog_height.saturating_sub(2);
         let inner = Rect::new(x + 2, y + 1, inner_width, inner_height);
-        
+
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),  // Symbol info
-                Constraint::Length(1),  // Spacer
-                Constraint::Length(3),  // Input box
-                Constraint::Length(1),  // Spacer
-                Constraint::Length(2),  // Hint
-                Constraint::Min(0),     // Spacer
+                Constraint::Length(2), // Symbol info
+                Constraint::Length(1), // Spacer
+                Constraint::Length(3), // Input box
+                Constraint::Length(1), // Spacer
+                Constraint::Length(2), // Hint
+                Constraint::Min(0),    // Spacer
             ])
             .split(inner);
-        
+
         // Symbol info
         let info = Paragraph::new(format!("Symbol: {}", symbol))
             .style(Style::default().fg(ratatui::style::Color::Gray));
         frame.render_widget(info, chunks[0]);
-        
+
         // Input box with cursor - handle scrolling and UTF-8 safely
         let max_display_width = inner_width.saturating_sub(4) as usize;
         let display_start = if self.input_cursor >= max_display_width {
@@ -1581,7 +1727,7 @@ impl MenuConfigApp {
             0
         };
         let display_end = std::cmp::min(display_start + max_display_width, self.input_buffer.len());
-        
+
         // Use safe UTF-8 slicing
         let visible_text = if display_start < self.input_buffer.len() {
             &self.input_buffer[display_start..display_end]
@@ -1589,7 +1735,7 @@ impl MenuConfigApp {
             ""
         };
         let cursor_pos = self.input_cursor.saturating_sub(display_start);
-        
+
         // Build display string safely using character iteration
         let input_display = if cursor_pos < visible_text.len() {
             let before = visible_text.chars().take(cursor_pos).collect::<String>();
@@ -1598,7 +1744,7 @@ impl MenuConfigApp {
         } else {
             format!("│ {}█ │", visible_text)
         };
-        
+
         let input_box = Paragraph::new(vec![
             Line::from("┌───────────────────────────────────────┐"),
             Line::from(input_display),
@@ -1606,20 +1752,21 @@ impl MenuConfigApp {
         ])
         .style(Style::default().fg(ratatui::style::Color::White));
         frame.render_widget(input_box, chunks[2]);
-        
+
         // Hint
         let hint_text = Paragraph::new(vec![
             Line::from(hint).style(Style::default().fg(ratatui::style::Color::Yellow)),
-            Line::from("ESC: Cancel | Enter: Save").style(Style::default().fg(ratatui::style::Color::Gray)),
+            Line::from("ESC: Cancel | Enter: Save")
+                .style(Style::default().fg(ratatui::style::Color::Gray)),
         ]);
         frame.render_widget(hint_text, chunks[4]);
     }
-    
+
     // Validation functions
     fn validate_int(input: &str) -> Option<i64> {
         input.trim().parse::<i64>().ok()
     }
-    
+
     fn validate_hex(input: &str) -> Option<String> {
         let trimmed = input.trim();
         if !trimmed.starts_with("0x") && !trimmed.starts_with("0X") {
@@ -1631,20 +1778,22 @@ impl MenuConfigApp {
         }
         Some(format!("0x{}", hex_part.to_lowercase()))
     }
-    
+
     fn save_input_dialog(&mut self) -> Result<()> {
         if let Some(dialog_type) = &self.dialog_type.clone() {
             match dialog_type {
                 DialogType::EditString { symbol, .. } => {
                     let new_value = self.input_buffer.clone();
                     self.update_config_value(symbol, ConfigValue::String(new_value.clone()))?;
-                    self.symbol_table.set_value_tracked(symbol, format!("\"{}\"", new_value));
+                    self.symbol_table
+                        .set_value_tracked(symbol, format!("\"{}\"", new_value));
                     self.status_message = Some(format!("✓ {} updated", symbol));
                 }
                 DialogType::EditInt { symbol, .. } => {
                     if let Some(value) = Self::validate_int(&self.input_buffer) {
                         self.update_config_value(symbol, ConfigValue::Int(value))?;
-                        self.symbol_table.set_value_tracked(symbol, value.to_string());
+                        self.symbol_table
+                            .set_value_tracked(symbol, value.to_string());
                         self.status_message = Some(format!("✓ {} = {}", symbol, value));
                     } else {
                         self.status_message = Some("✗ Invalid integer".to_string());
@@ -1664,13 +1813,13 @@ impl MenuConfigApp {
                 _ => {}
             }
         }
-        
+
         self.dialog_type = None;
         self.focus = PanelFocus::MenuTree;
         self.input_buffer.clear();
         Ok(())
     }
-    
+
     fn update_config_value(&mut self, symbol: &str, new_value: ConfigValue) -> Result<()> {
         // Update in all_items
         for item in &mut self.config_state.all_items {
@@ -1679,7 +1828,7 @@ impl MenuConfigApp {
                 break;
             }
         }
-        
+
         // Update in menu_tree
         for (_key, items) in self.config_state.menu_tree.iter_mut() {
             for item in items {
@@ -1689,7 +1838,7 @@ impl MenuConfigApp {
                 }
             }
         }
-        
+
         // Track modification
         let value_str = match &new_value {
             ConfigValue::String(s) => format!("\"{}\"", s),
@@ -1697,17 +1846,19 @@ impl MenuConfigApp {
             ConfigValue::Hex(h) => h.clone(),
             _ => return Ok(()),
         };
-        
+
         let original = self.config_state.original_values.get(symbol).cloned();
         if original.as_deref() != Some(value_str.as_str()) {
-            self.config_state.modified_symbols.insert(symbol.to_string(), value_str);
+            self.config_state
+                .modified_symbols
+                .insert(symbol.to_string(), value_str);
         } else {
             self.config_state.modified_symbols.remove(symbol);
         }
-        
+
         Ok(())
     }
-    
+
     /// Helper function to format an Expr into a human-readable string
     fn format_expr(expr: &Expr) -> String {
         match expr {
@@ -1716,32 +1867,52 @@ impl MenuConfigApp {
             Expr::ShellExpr(e) => format!("shell({})", e),
             Expr::Not(e) => format!("!{}", Self::format_expr(e)),
             Expr::And(left, right) => {
-                format!("{} && {}", Self::format_expr(left), Self::format_expr(right))
+                format!(
+                    "{} && {}",
+                    Self::format_expr(left),
+                    Self::format_expr(right)
+                )
             }
             Expr::Or(left, right) => {
-                format!("{} || {}", Self::format_expr(left), Self::format_expr(right))
+                format!(
+                    "{} || {}",
+                    Self::format_expr(left),
+                    Self::format_expr(right)
+                )
             }
             Expr::Equal(left, right) => {
                 format!("{} = {}", Self::format_expr(left), Self::format_expr(right))
             }
             Expr::NotEqual(left, right) => {
-                format!("{} != {}", Self::format_expr(left), Self::format_expr(right))
+                format!(
+                    "{} != {}",
+                    Self::format_expr(left),
+                    Self::format_expr(right)
+                )
             }
             Expr::Less(left, right) => {
                 format!("{} < {}", Self::format_expr(left), Self::format_expr(right))
             }
             Expr::LessEqual(left, right) => {
-                format!("{} <= {}", Self::format_expr(left), Self::format_expr(right))
+                format!(
+                    "{} <= {}",
+                    Self::format_expr(left),
+                    Self::format_expr(right)
+                )
             }
             Expr::Greater(left, right) => {
                 format!("{} > {}", Self::format_expr(left), Self::format_expr(right))
             }
             Expr::GreaterEqual(left, right) => {
-                format!("{} >= {}", Self::format_expr(left), Self::format_expr(right))
+                format!(
+                    "{} >= {}",
+                    Self::format_expr(left),
+                    Self::format_expr(right)
+                )
             }
         }
     }
-    
+
     /// Find the menu path and index for a given item ID
     /// Returns (path, index) where path is the parent menu path and index is the position in that menu
     fn find_item_location(&self, item_id: &str) -> Option<(Vec<String>, usize)> {
@@ -1753,13 +1924,13 @@ impl MenuConfigApp {
                 }
             }
         }
-        
+
         // Check all other menu levels
         for (parent_key, items) in &self.config_state.menu_tree {
             if parent_key == "root" {
                 continue;
             }
-            
+
             for (idx, item) in items.iter().enumerate() {
                 if item.id == item_id {
                     // Build the path to this item
@@ -1768,18 +1939,18 @@ impl MenuConfigApp {
                 }
             }
         }
-        
+
         None
     }
-    
+
     /// Build the path to a specific menu by its ID
-    /// 
+    ///
     /// # Limitation
     /// This is a simplified implementation that handles one level of nesting.
     /// For deeply nested menus (menu within menu within menu), only the immediate
     /// parent menu will be in the path. This is sufficient for most Kconfig files
     /// which typically have a flat or shallow menu structure (e.g., root -> menu -> items).
-    /// 
+    ///
     /// If full path resolution is needed in the future, this would require building
     /// a parent map during ConfigState construction or performing a recursive search.
     fn build_path_to_menu(&self, menu_id: &str) -> Vec<String> {
@@ -1793,7 +1964,7 @@ impl MenuConfigApp {
                 }
             }
         }
-        
+
         // Otherwise, we need to search through all menus to build the full path
         // This is a simplified implementation that handles one level of nesting
         vec![menu_id.to_string()]
@@ -1817,12 +1988,27 @@ mod tests {
 
     #[test]
     fn test_validate_hex() {
-        assert_eq!(MenuConfigApp::validate_hex("0xFF"), Some("0xff".to_string()));
-        assert_eq!(MenuConfigApp::validate_hex("0x1A2B"), Some("0x1a2b".to_string()));
-        assert_eq!(MenuConfigApp::validate_hex("0X100"), Some("0x100".to_string()));
-        assert_eq!(MenuConfigApp::validate_hex("0xaBcDeF"), Some("0xabcdef".to_string()));
+        assert_eq!(
+            MenuConfigApp::validate_hex("0xFF"),
+            Some("0xff".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::validate_hex("0x1A2B"),
+            Some("0x1a2b".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::validate_hex("0X100"),
+            Some("0x100".to_string())
+        );
+        assert_eq!(
+            MenuConfigApp::validate_hex("0xaBcDeF"),
+            Some("0xabcdef".to_string())
+        );
         assert_eq!(MenuConfigApp::validate_hex("0x0"), Some("0x0".to_string()));
-        assert_eq!(MenuConfigApp::validate_hex("  0xFF  "), Some("0xff".to_string()));
+        assert_eq!(
+            MenuConfigApp::validate_hex("  0xFF  "),
+            Some("0xff".to_string())
+        );
         assert_eq!(MenuConfigApp::validate_hex("FF"), None);
         assert_eq!(MenuConfigApp::validate_hex("0x"), None);
         assert_eq!(MenuConfigApp::validate_hex("0xGG"), None);

@@ -24,7 +24,7 @@ impl Parser {
     pub fn new(kconfig_path: impl AsRef<Path>, srctree: impl AsRef<Path>) -> Result<Self> {
         let kconfig_path = kconfig_path.as_ref().to_path_buf();
         let srctree = srctree.as_ref().to_path_buf();
-        
+
         if !kconfig_path.exists() {
             return Err(KconfigError::FileNotFound(kconfig_path));
         }
@@ -86,7 +86,7 @@ impl Parser {
     fn handle_source(&mut self, path_expr: String) -> Result<Vec<Entry>> {
         // Resolve the path relative to srctree
         let source_path = self.srctree.join(&path_expr);
-        
+
         // Check if file exists
         if !source_path.exists() {
             return Err(KconfigError::FileNotFound(source_path));
@@ -174,11 +174,11 @@ impl Parser {
                     self.advance()?; // consume 'source'
                     let path = self.parse_string()?;
                     self.skip_newlines()?;
-                    
+
                     // Recursively parse the source file
                     let source_entries = self.handle_source(path.clone())?;
                     entries.extend(source_entries);
-                    
+
                     // Also add the source entry itself
                     entries.push(Entry::Source(Source {
                         path: PathBuf::from(path),
@@ -219,7 +219,7 @@ impl Parser {
 
     fn parse_config(&mut self) -> Result<Config> {
         self.advance()?; // consume 'config'
-        
+
         let name = match &self.current_context().current_token {
             Token::Identifier(s) => s.clone(),
             _ => {
@@ -244,7 +244,7 @@ impl Parser {
 
     fn parse_menuconfig(&mut self) -> Result<MenuConfig> {
         self.advance()?; // consume 'menuconfig'
-        
+
         let name = match &self.current_context().current_token {
             Token::Identifier(s) => s.clone(),
             _ => {
@@ -332,15 +332,15 @@ impl Parser {
                 Token::Default => {
                     self.advance()?;
                     let value = self.parse_expr()?;
-                    
+
                     // Check for optional 'if' condition
                     let condition = if matches!(self.current_context().current_token, Token::If) {
-                        self.advance()?;  // consume 'if'
+                        self.advance()?; // consume 'if'
                         Some(self.parse_expr()?)
                     } else {
                         None
                     };
-                    
+
                     properties.defaults.push(DefaultValue { value, condition });
                 }
                 Token::Depends => {
@@ -696,5 +696,4 @@ impl Parser {
             Err(KconfigError::Parse("No prompt found".to_string()))
         }
     }
-
 }

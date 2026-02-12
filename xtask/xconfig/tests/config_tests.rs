@@ -1,7 +1,7 @@
-use xconfig::config::{ConfigReader, ConfigWriter};
-use xconfig::kconfig::{SymbolTable, SymbolType};
 use std::fs;
 use tempfile::TempDir;
+use xconfig::config::{ConfigReader, ConfigWriter};
+use xconfig::kconfig::{SymbolTable, SymbolType};
 
 #[test]
 fn test_config_reader() {
@@ -19,7 +19,11 @@ fn test_config_reader_backward_compat() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("test.config");
 
-    fs::write(&config_path, "CONFIG_TEST1=y\nCONFIG_TEST2=\"value\"\n# CONFIG_TEST3 is not set\n").unwrap();
+    fs::write(
+        &config_path,
+        "CONFIG_TEST1=y\nCONFIG_TEST2=\"value\"\n# CONFIG_TEST3 is not set\n",
+    )
+    .unwrap();
 
     let config = ConfigReader::read(&config_path).unwrap();
     assert_eq!(config.get("TEST1"), Some(&"y".to_string()));
@@ -82,8 +86,14 @@ fn test_config_writer_int_no_quotes() {
     ConfigWriter::write(&config_path, &symbols).unwrap();
 
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("MAX_CPUS=102"), "Int should not have quotes");
-    assert!(content.contains("LOG_LEVEL=4"), "Int should not have quotes");
+    assert!(
+        content.contains("MAX_CPUS=102"),
+        "Int should not have quotes"
+    );
+    assert!(
+        content.contains("LOG_LEVEL=4"),
+        "Int should not have quotes"
+    );
     assert!(!content.contains("\"102\""), "Int should not have quotes");
     assert!(!content.contains("\"4\""), "Int should not have quotes");
 }
@@ -95,11 +105,11 @@ fn test_config_writer_hex_no_quotes() {
     let config_path = temp_dir.path().join("test.config");
 
     let mut symbols = SymbolTable::new();
-    
+
     // Test hex value starting with 0x
     symbols.add_symbol("MEMORY_BASE".to_string(), SymbolType::Hex);
     symbols.set_value("MEMORY_BASE", "0x80000000".to_string());
-    
+
     // Test hex value as decimal number (should be converted to hex)
     symbols.add_symbol("MEMORY_SIZE".to_string(), SymbolType::Hex);
     symbols.set_value("MEMORY_SIZE", "2147483648".to_string());
@@ -107,10 +117,19 @@ fn test_config_writer_hex_no_quotes() {
     ConfigWriter::write(&config_path, &symbols).unwrap();
 
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("MEMORY_BASE=0x80000000"), "Hex should be in 0x format without quotes");
-    assert!(content.contains("MEMORY_SIZE=0x80000000"), "Decimal should be converted to hex format");
+    assert!(
+        content.contains("MEMORY_BASE=0x80000000"),
+        "Hex should be in 0x format without quotes"
+    );
+    assert!(
+        content.contains("MEMORY_SIZE=0x80000000"),
+        "Decimal should be converted to hex format"
+    );
     assert!(!content.contains("\"0x"), "Hex should not have quotes");
-    assert!(!content.contains("\"2147483648\""), "Decimal input should be converted to hex");
+    assert!(
+        !content.contains("\"2147483648\""),
+        "Decimal input should be converted to hex"
+    );
 }
 
 #[test]
@@ -128,8 +147,14 @@ fn test_config_writer_string_with_quotes() {
     ConfigWriter::write(&config_path, &symbols).unwrap();
 
     let content = fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("KERNEL_VERSION=\"0.0.1\""), "String should have quotes");
-    assert!(content.contains("BUILD_ID=\"abc123\""), "String should have quotes");
+    assert!(
+        content.contains("KERNEL_VERSION=\"0.0.1\""),
+        "String should have quotes"
+    );
+    assert!(
+        content.contains("BUILD_ID=\"abc123\""),
+        "String should have quotes"
+    );
 }
 
 #[test]
@@ -139,19 +164,19 @@ fn test_config_writer_all_types() {
     let config_path = temp_dir.path().join("test.config");
 
     let mut symbols = SymbolTable::new();
-    
+
     // Bool types
     symbols.add_symbol("ARM64".to_string(), SymbolType::Bool);
     symbols.set_value("ARM64", "y".to_string());
-    
+
     // Int type
     symbols.add_symbol("MAX_CPUS".to_string(), SymbolType::Int);
     symbols.set_value("MAX_CPUS", "102".to_string());
-    
+
     // Hex type
     symbols.add_symbol("MEMORY_BASE".to_string(), SymbolType::Hex);
     symbols.set_value("MEMORY_BASE", "2147483648".to_string());
-    
+
     // String type
     symbols.add_symbol("KERNEL_VERSION".to_string(), SymbolType::String);
     symbols.set_value("KERNEL_VERSION", "0.0.1".to_string());
@@ -159,16 +184,31 @@ fn test_config_writer_all_types() {
     ConfigWriter::write(&config_path, &symbols).unwrap();
 
     let content = fs::read_to_string(&config_path).unwrap();
-    
+
     // Verify format
     assert!(content.contains("ARM64=y"), "Bool should not have quotes");
-    assert!(content.contains("MAX_CPUS=102"), "Int should not have quotes");
-    assert!(content.contains("MEMORY_BASE=0x80000000"), "Hex should be in 0x format without quotes");
-    assert!(content.contains("KERNEL_VERSION=\"0.0.1\""), "String should have quotes");
-    
+    assert!(
+        content.contains("MAX_CPUS=102"),
+        "Int should not have quotes"
+    );
+    assert!(
+        content.contains("MEMORY_BASE=0x80000000"),
+        "Hex should be in 0x format without quotes"
+    );
+    assert!(
+        content.contains("KERNEL_VERSION=\"0.0.1\""),
+        "String should have quotes"
+    );
+
     // Verify no unwanted quotes
-    assert!(!content.contains("MAX_CPUS=\""), "Int should not have quotes");
-    assert!(!content.contains("MEMORY_BASE=\""), "Hex should not have quotes");
+    assert!(
+        !content.contains("MAX_CPUS=\""),
+        "Int should not have quotes"
+    );
+    assert!(
+        !content.contains("MEMORY_BASE=\""),
+        "Hex should not have quotes"
+    );
 }
 
 #[test]

@@ -23,16 +23,16 @@ pub struct Implication {
 pub struct DependencyResolver {
     /// Map: symbol -> list of symbols it depends on
     depends_map: HashMap<String, Vec<Dependency>>,
-    
+
     /// Map: symbol -> list of symbols it selects
     select_map: HashMap<String, Vec<Selection>>,
-    
+
     /// Map: symbol -> list of symbols it implies
     imply_map: HashMap<String, Vec<Implication>>,
-    
+
     /// Map: symbol -> list of symbols that select it (reverse dependencies)
     reverse_select_map: HashMap<String, Vec<String>>,
-    
+
     /// Expression evaluator
     expr_evaluator: ExprEvaluator,
 }
@@ -47,12 +47,12 @@ impl DependencyResolver {
             expr_evaluator: ExprEvaluator::new(),
         }
     }
-    
+
     /// Build dependency maps from Kconfig AST
     pub fn build_from_entries(&mut self, entries: &[Entry]) {
         self.process_entries(entries);
     }
-    
+
     fn process_entries(&mut self, entries: &[Entry]) {
         for entry in entries {
             match entry {
@@ -77,7 +77,7 @@ impl DependencyResolver {
             }
         }
     }
-    
+
     fn process_config(&mut self, name: &str, properties: &Property) {
         // Extract depends
         if let Some(depends_expr) = &properties.depends {
@@ -89,10 +89,10 @@ impl DependencyResolver {
                         symbol: s,
                         condition: Some(depends_expr.clone()),
                     })
-                    .collect()
+                    .collect(),
             );
         }
-        
+
         // Extract selects
         if !properties.select.is_empty() {
             let mut selections = Vec::new();
@@ -101,7 +101,7 @@ impl DependencyResolver {
                     symbol: selected_symbol.clone(),
                     condition: condition.clone(),
                 });
-                
+
                 // Build reverse map
                 self.reverse_select_map
                     .entry(selected_symbol.clone())
@@ -110,10 +110,11 @@ impl DependencyResolver {
             }
             self.select_map.insert(name.to_string(), selections);
         }
-        
+
         // Extract implies
         if !properties.imply.is_empty() {
-            let implications: Vec<Implication> = properties.imply
+            let implications: Vec<Implication> = properties
+                .imply
                 .iter()
                 .map(|(symbol, condition)| Implication {
                     symbol: symbol.clone(),
@@ -123,20 +124,24 @@ impl DependencyResolver {
             self.imply_map.insert(name.to_string(), implications);
         }
     }
-    
+
     fn extract_symbols_from_expr(&self, expr: &Expr) -> Vec<String> {
         let mut symbols = Vec::new();
         self.collect_symbols(expr, &mut symbols);
         symbols
     }
-    
+
     fn collect_symbols(&self, expr: &Expr, symbols: &mut Vec<String>) {
         match expr {
             Expr::Symbol(name) => symbols.push(name.clone()),
-            Expr::And(left, right) | Expr::Or(left, right) | 
-            Expr::Equal(left, right) | Expr::NotEqual(left, right) |
-            Expr::Less(left, right) | Expr::LessEqual(left, right) |
-            Expr::Greater(left, right) | Expr::GreaterEqual(left, right) => {
+            Expr::And(left, right)
+            | Expr::Or(left, right)
+            | Expr::Equal(left, right)
+            | Expr::NotEqual(left, right)
+            | Expr::Less(left, right)
+            | Expr::LessEqual(left, right)
+            | Expr::Greater(left, right)
+            | Expr::GreaterEqual(left, right) => {
                 self.collect_symbols(left, symbols);
                 self.collect_symbols(right, symbols);
             }
@@ -144,9 +149,13 @@ impl DependencyResolver {
             _ => {}
         }
     }
-    
+
     /// Check if a symbol can be enabled (all dependencies met)
-    pub fn can_enable(&self, symbol: &str, symbol_table: &SymbolTable) -> Result<(), DependencyError> {
+    pub fn can_enable(
+        &self,
+        symbol: &str,
+        symbol_table: &SymbolTable,
+    ) -> Result<(), DependencyError> {
         if let Some(deps) = self.depends_map.get(symbol) {
             // Note: All deps have the same condition (the full depends expression),
             // so we only need to check it once
@@ -161,12 +170,16 @@ impl DependencyResolver {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Check if a symbol can be disabled (nothing selects it)
-    pub fn can_disable(&self, symbol: &str, symbol_table: &SymbolTable) -> Result<(), DependencyError> {
+    pub fn can_disable(
+        &self,
+        symbol: &str,
+        symbol_table: &SymbolTable,
+    ) -> Result<(), DependencyError> {
         if let Some(selectors) = self.reverse_select_map.get(symbol) {
             for selector in selectors {
                 if symbol_table.is_enabled(selector) {
@@ -177,14 +190,14 @@ impl DependencyResolver {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Apply select cascade when enabling a symbol
     pub fn apply_selects(&self, symbol: &str, symbol_table: &mut SymbolTable) -> Vec<String> {
         let mut enabled = Vec::new();
-        
+
         if let Some(selections) = self.select_map.get(symbol) {
             for selection in selections {
                 // Check condition
@@ -193,25 +206,25 @@ impl DependencyResolver {
                 } else {
                     true
                 };
-                
+
                 if should_select && !symbol_table.is_enabled(&selection.symbol) {
                     symbol_table.set_value(&selection.symbol, "y".to_string());
                     enabled.push(selection.symbol.clone());
-                    
+
                     // Recursively apply selects
                     let cascaded = self.apply_selects(&selection.symbol, symbol_table);
                     enabled.extend(cascaded);
                 }
             }
         }
-        
+
         enabled
     }
-    
+
     /// Apply imply suggestions when enabling a symbol
     pub fn get_implied_symbols(&self, symbol: &str, symbol_table: &SymbolTable) -> Vec<String> {
         let mut implied = Vec::new();
-        
+
         if let Some(implications) = self.imply_map.get(symbol) {
             for implication in implications {
                 let should_imply = if let Some(condition) = &implication.condition {
@@ -219,7 +232,7 @@ impl DependencyResolver {
                 } else {
                     true
                 };
-                
+
                 if should_imply && !symbol_table.is_enabled(&implication.symbol) {
                     // FIX: Check if implied symbol's dependencies are satisfied
                     if self.can_enable(&implication.symbol, symbol_table).is_ok() {
@@ -229,14 +242,14 @@ impl DependencyResolver {
                 }
             }
         }
-        
+
         implied
     }
-    
+
     /// Check for conflicts when disabling a symbol
     pub fn check_disable_cascade(&self, symbol: &str, symbol_table: &SymbolTable) -> Vec<String> {
         let mut affected = Vec::new();
-        
+
         // Find all symbols that depend on this one
         for (dependent, deps) in &self.depends_map {
             if symbol_table.is_enabled(dependent) {
@@ -247,10 +260,10 @@ impl DependencyResolver {
                 }
             }
         }
-        
+
         affected
     }
-    
+
     /// Format an expression as a human-readable string
     fn format_expr(&self, expr: &Expr) -> String {
         match expr {
@@ -258,14 +271,34 @@ impl DependencyResolver {
             Expr::Const(c) => c.clone(),
             Expr::ShellExpr(e) => format!("shell({})", e),
             Expr::Not(inner) => format!("!{}", self.format_expr(inner)),
-            Expr::And(left, right) => format!("({} && {})", self.format_expr(left), self.format_expr(right)),
-            Expr::Or(left, right) => format!("({} || {})", self.format_expr(left), self.format_expr(right)),
-            Expr::Equal(left, right) => format!("{} = {}", self.format_expr(left), self.format_expr(right)),
-            Expr::NotEqual(left, right) => format!("{} != {}", self.format_expr(left), self.format_expr(right)),
-            Expr::Less(left, right) => format!("{} < {}", self.format_expr(left), self.format_expr(right)),
-            Expr::LessEqual(left, right) => format!("{} <= {}", self.format_expr(left), self.format_expr(right)),
-            Expr::Greater(left, right) => format!("{} > {}", self.format_expr(left), self.format_expr(right)),
-            Expr::GreaterEqual(left, right) => format!("{} >= {}", self.format_expr(left), self.format_expr(right)),
+            Expr::And(left, right) => format!(
+                "({} && {})",
+                self.format_expr(left),
+                self.format_expr(right)
+            ),
+            Expr::Or(left, right) => format!(
+                "({} || {})",
+                self.format_expr(left),
+                self.format_expr(right)
+            ),
+            Expr::Equal(left, right) => {
+                format!("{} = {}", self.format_expr(left), self.format_expr(right))
+            }
+            Expr::NotEqual(left, right) => {
+                format!("{} != {}", self.format_expr(left), self.format_expr(right))
+            }
+            Expr::Less(left, right) => {
+                format!("{} < {}", self.format_expr(left), self.format_expr(right))
+            }
+            Expr::LessEqual(left, right) => {
+                format!("{} <= {}", self.format_expr(left), self.format_expr(right))
+            }
+            Expr::Greater(left, right) => {
+                format!("{} > {}", self.format_expr(left), self.format_expr(right))
+            }
+            Expr::GreaterEqual(left, right) => {
+                format!("{} >= {}", self.format_expr(left), self.format_expr(right))
+            }
         }
     }
 }
@@ -288,10 +321,18 @@ impl std::fmt::Display for DependencyError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             DependencyError::DependencyNotMet { symbol, required } => {
-                write!(f, "Cannot enable {}: requires {} to be enabled first", symbol, required)
+                write!(
+                    f,
+                    "Cannot enable {}: requires {} to be enabled first",
+                    symbol, required
+                )
             }
             DependencyError::ConditionNotMet { symbol, condition } => {
-                write!(f, "Cannot enable {}: dependency not met: {}", symbol, condition)
+                write!(
+                    f,
+                    "Cannot enable {}: dependency not met: {}",
+                    symbol, condition
+                )
             }
             DependencyError::SelectedBy { symbol, selector } => {
                 write!(f, "Cannot disable {}: selected by {}", symbol, selector)
@@ -312,7 +353,7 @@ impl ExprEvaluator {
     pub fn new() -> Self {
         Self
     }
-    
+
     pub fn evaluate(&self, expr: &Expr, symbol_table: &SymbolTable) -> bool {
         match expr {
             Expr::Symbol(name) => symbol_table.is_enabled(name),
@@ -336,10 +377,12 @@ impl ExprEvaluator {
             _ => false,
         }
     }
-    
+
     fn get_expr_value(&self, expr: &Expr, symbol_table: &SymbolTable) -> String {
         match expr {
-            Expr::Symbol(name) => symbol_table.get_value(name).unwrap_or_else(|| "n".to_string()),
+            Expr::Symbol(name) => symbol_table
+                .get_value(name)
+                .unwrap_or_else(|| "n".to_string()),
             Expr::Const(val) => val.clone(),
             _ => "n".to_string(),
         }

@@ -39,25 +39,25 @@ pub enum Token {
     ListNewConfig,
 
     // Operators
-    Eq,          // =
-    NotEq,       // !=
-    Less,        // <
-    LessEq,      // <=
-    Greater,     // >
-    GreaterEq,   // >=
-    And,         // &&
-    Or,          // ||
-    Not,         // !
-    
+    Eq,        // =
+    NotEq,     // !=
+    Less,      // <
+    LessEq,    // <=
+    Greater,   // >
+    GreaterEq, // >=
+    And,       // &&
+    Or,        // ||
+    Not,       // !
+
     // Literals
     Identifier(String),
     StringLit(String),
     Number(i64),
-    
+
     // Punctuation
-    LParen,      // (
-    RParen,      // )
-    
+    LParen, // (
+    RParen, // )
+
     // Special
     Newline,
     Eof,
@@ -90,7 +90,7 @@ impl Lexer {
 
     pub fn skip_help_text(&mut self) -> String {
         let mut help = String::new();
-        
+
         // Skip any whitespace/newlines immediately after "help" keyword
         while let Some(ch) = self.current_char() {
             if ch == '\n' {
@@ -103,12 +103,12 @@ impl Lexer {
                 break;
             }
         }
-        
+
         // Now collect all indented lines
         loop {
             // Peek at the start of the line
             let _line_start = self.position;
-            
+
             // Check if this line is indented (starts with space or tab)
             match self.current_char() {
                 None => break, // EOF
@@ -135,7 +135,7 @@ impl Lexer {
                 }
             }
         }
-        
+
         help
     }
 
@@ -228,7 +228,7 @@ impl Lexer {
 
     fn read_number(&mut self) -> i64 {
         let mut result = String::new();
-        
+
         // Handle hex numbers
         if self.current_char() == Some('0') && self.peek_char(1) == Some('x') {
             self.advance(); // 0

@@ -1,10 +1,10 @@
 use clap::{Args, Parser, Subcommand};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::env;
 
 #[derive(Debug, Deserialize)]
 struct CargoToml {
@@ -158,11 +158,8 @@ fn validate_features(workspace: &Workspace) -> Result<(), String> {
         .collect();
 
     // 2. Build a set of all workspace packages
-    let workspace_packages: HashSet<String> = workspace
-        .crates
-        .iter()
-        .map(|c| c.name.clone())
-        .collect();
+    let workspace_packages: HashSet<String> =
+        workspace.crates.iter().map(|c| c.name.clone()).collect();
 
     // 3. Validate each kbuild-enabled crate's features
     for crate_info in workspace.crates.iter().filter(|c| c.is_kbuild_enabled()) {
@@ -191,7 +188,8 @@ fn validate_features(workspace: &Workspace) -> Result<(), String> {
                             feature_name,
                             dep,
                             pkg_name,
-                            feature_name, pkg_name,
+                            feature_name,
+                            pkg_name,
                             sub_feature
                         ));
                     } else if workspace_packages.contains(pkg_name) {
@@ -268,7 +266,10 @@ fn generate_cargo_config(workspace_root: &Path, configs: &HashSet<String>) -> Re
     fs::write(&config_path, content)
         .map_err(|e| format!("Failed to write .cargo/config.toml: {}", e))?;
 
-    println!("✅ Generated .cargo/config.toml with {} config declarations", configs.len());
+    println!(
+        "✅ Generated .cargo/config.toml with {} config declarations",
+        configs.len()
+    );
     Ok(())
 }
 
@@ -279,8 +280,8 @@ fn generate_cargo_config(workspace_root: &Path, configs: &HashSet<String>) -> Re
 /// - Hex: CONFIG_X=0xff (no quotes)
 /// - String: CONFIG_X="value" (with quotes)
 fn parse_config(config_path: &Path) -> Result<HashMap<String, String>, String> {
-    let content = fs::read_to_string(config_path)
-        .map_err(|e| format!("Failed to read .config: {}", e))?;
+    let content =
+        fs::read_to_string(config_path).map_err(|e| format!("Failed to read .config: {}", e))?;
 
     let mut config = HashMap::new();
     for line in content.lines() {
@@ -292,14 +293,14 @@ fn parse_config(config_path: &Path) -> Result<HashMap<String, String>, String> {
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim();
             let value = value.trim();
-            
+
             // Remove quotes if present (for backward compatibility)
             let value = if value.starts_with('"') && value.ends_with('"') {
-                &value[1..value.len()-1]
+                &value[1..value.len() - 1]
             } else {
                 value
             };
-            
+
             config.insert(key.to_string(), value.to_string());
         }
     }
@@ -325,7 +326,10 @@ fn generate_features(config: &HashMap<String, String>) -> Vec<String> {
 /// - Int: decimal numbers (e.g., 123)
 /// - Hex: 0x-prefixed numbers (e.g., 0xff)
 /// - String: everything else with quotes
-fn generate_config_rs(workspace_root: &Path, config: &HashMap<String, String>) -> Result<(), String> {
+fn generate_config_rs(
+    workspace_root: &Path,
+    config: &HashMap<String, String>,
+) -> Result<(), String> {
     let target_dir = workspace_root.join("target/kbuild");
     fs::create_dir_all(&target_dir)
         .map_err(|e| format!("Failed to create target/kbuild: {}", e))?;
@@ -370,8 +374,7 @@ fn generate_config_rs(workspace_root: &Path, config: &HashMap<String, String>) -
         }
     }
 
-    fs::write(&config_rs_path, content)
-        .map_err(|e| format!("Failed to write config.rs: {}", e))?;
+    fs::write(&config_rs_path, content).map_err(|e| format!("Failed to write config.rs: {}", e))?;
 
     println!("📝 Generated config.rs at: {}", config_rs_path.display());
 
@@ -395,35 +398,39 @@ fn apply_kbuild_config(
     cargo_cmd: &str,
     extra_args: &[String],
 ) -> Result<(), String> {
-    println!("🔨 Running cargo {} with kbuild configuration...\n", cargo_cmd);
+    println!(
+        "🔨 Running cargo {} with kbuild configuration...\n",
+        cargo_cmd
+    );
 
     // Parse workspace
     let workspace = Workspace::new(workspace_root.to_path_buf())?;
-    
+
     // Validate features
     validate_features(&workspace)?;
-    
+
     // Parse .config to get all CONFIG_* options
     let config = parse_config(config_path)?;
-    
+
     // Generate config.rs file with constants
     generate_config_rs(workspace_root, &config)?;
     println!();
-    
+
     // Collect all CONFIG_* names from .config file and generate .cargo/config.toml
     let all_configs = collect_all_configs_from_file(&config);
     generate_cargo_config(workspace_root, &all_configs)?;
     println!();
-    
+
     // Generate features - only include features that are declared in Cargo.toml
     let features = generate_features(&config);
     let declared_features = collect_all_configs(&workspace);
-    
+
     // Filter to only features that are actually declared in Cargo.toml
-    let filtered_features: Vec<String> = features.into_iter()
+    let filtered_features: Vec<String> = features
+        .into_iter()
         .filter(|f| declared_features.contains(f))
         .collect();
-    
+
     println!("📋 Enabled features from .config:");
     for feature in &filtered_features {
         println!("  - {}", feature);
@@ -432,19 +439,18 @@ fn apply_kbuild_config(
         println!("  (none - all CONFIG_* used via cfg flags)");
     }
     println!();
-    
+
     // Build cargo command
     let mut cargo_args = vec![cargo_cmd.to_string()];
-    
+
     if !filtered_features.is_empty() {
         cargo_args.push("--features".to_string());
         cargo_args.push(filtered_features.join(","));
     }
-    
+
     // Add extra arguments
     cargo_args.extend_from_slice(extra_args);
 
-    
     // Extract top-level cargo options like -C that must come before the subcommand
     let mut top_level_args: Vec<String> = Vec::new();
     let mut subcommand_args: Vec<String> = Vec::new();
@@ -456,7 +462,7 @@ fn apply_kbuild_config(
             i += 1;
             continue;
         }
-        
+
         // Check for -C option (directory change)
         if cargo_args[i] == "-C" && i + 1 < cargo_args.len() {
             top_level_args.push(cargo_args[i].clone());
@@ -464,7 +470,7 @@ fn apply_kbuild_config(
             i += 2;
             continue;
         }
-        
+
         // Check for -Z option (unstable features)
         if cargo_args[i] == "-Z" && i + 1 < cargo_args.len() {
             top_level_args.push(cargo_args[i].clone());
@@ -472,17 +478,17 @@ fn apply_kbuild_config(
             i += 2;
             continue;
         }
-        
+
         // All other args go after the subcommand
         subcommand_args.push(cargo_args[i].clone());
         i += 1;
     }
-    
+
     // Rebuild cargo_args with proper order: top_level_args, subcommand, subcommand_args
     let mut final_cargo_args: Vec<String> = Vec::new();
     final_cargo_args.extend(top_level_args);
     final_cargo_args.extend(subcommand_args);
-    
+
     println!("🚀 Running: cargo {}\n", final_cargo_args.join(" "));
 
     let mut rustflags = env::var("RUSTFLAGS").unwrap_or_default();
@@ -520,7 +526,8 @@ fn apply_kbuild_config(
         cmd.env("RUSTFLAGS", rustflags);
     }
 
-    let status = cmd.status()
+    let status = cmd
+        .status()
         .map_err(|e| format!("Failed to run cargo: {}", e))?;
 
     if !status.success() {
@@ -532,7 +539,11 @@ fn apply_kbuild_config(
 }
 
 #[derive(Parser, Debug)]
-#[command(bin_name = "cargo", version, about = "Kconfig-style configuration for Cargo")]
+#[command(
+    bin_name = "cargo",
+    version,
+    about = "Kconfig-style configuration for Cargo"
+)]
 enum Cargo {
     Kbuild(KbuildCommand),
 }
@@ -591,10 +602,6 @@ fn run_cargo_with_kbuild(
     }
 }
 
-
-
-
-
 /// Print help message
 fn print_help() {
     println!("cargo-kbuild");
@@ -633,7 +640,7 @@ fn extract_kconfig_arg(args: &[String]) -> (Option<PathBuf>, Vec<String>) {
     let mut kconfig_path = None;
     let mut remaining = Vec::new();
     let mut iter = args.iter();
-    
+
     while let Some(arg) = iter.next() {
         if arg == "--kconfig" {
             if let Some(path) = iter.next() {
@@ -643,29 +650,28 @@ fn extract_kconfig_arg(args: &[String]) -> (Option<PathBuf>, Vec<String>) {
             remaining.push(arg.clone());
         }
     }
-    
+
     (kconfig_path, remaining)
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     // Handle both `cargo-kbuild` and `cargo kbuild` invocation patterns
     let is_cargo_subcommand = args.len() > 1 && args[1] == "kbuild";
-    
+
     // For cargo subcommand pattern, try using clap
     if is_cargo_subcommand {
         match Cargo::try_parse() {
             Ok(Cargo::Kbuild(kbuild)) => {
-                let workspace_root = env::current_dir()
-                    .expect("Failed to get current directory");
-                
+                let workspace_root = env::current_dir().expect("Failed to get current directory");
+
                 let kconfig_path = if kbuild.kconfig.is_absolute() {
                     kbuild.kconfig
                 } else {
                     workspace_root.join(kbuild.kconfig)
                 };
-                
+
                 match kbuild.command {
                     Some(KbuildSubcommand::Build { args }) => {
                         run_cargo_with_kbuild(&workspace_root, &kconfig_path, "build", &args);
@@ -704,28 +710,22 @@ fn main() {
             }
         }
     }
-    
+
     // Legacy cargo-kbuild invocation (without "kbuild" as first arg)
     // This maintains backward compatibility
-    let command_args = if args.len() > 1 {
-        &args[1..]
-    } else {
-        &[]
-    };
-    
+    let command_args = if args.len() > 1 { &args[1..] } else { &[] };
+
     if command_args.is_empty() {
         print_help();
         process::exit(1);
     }
-    
-    let workspace_root = env::current_dir()
-        .expect("Failed to get current directory");
-    
+
+    let workspace_root = env::current_dir().expect("Failed to get current directory");
+
     // Extract --kconfig if present
     let (kconfig_path, remaining_args) = extract_kconfig_arg(command_args);
-    let kconfig_path = kconfig_path
-        .unwrap_or_else(|| workspace_root.join(".config"));
-    
+    let kconfig_path = kconfig_path.unwrap_or_else(|| workspace_root.join(".config"));
+
     match remaining_args.get(0).map(|s| s.as_str()) {
         Some("--help") | Some("-h") | Some("help") => print_help(),
         Some("--version") | Some("-v") | Some("version") => print_version(),

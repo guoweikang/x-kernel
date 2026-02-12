@@ -1,6 +1,6 @@
+use std::path::PathBuf;
 use xconfig::kconfig::Parser;
 use xconfig::ui::app::MenuConfigApp;
-use std::path::PathBuf;
 
 #[test]
 fn test_search_result_item_location() {
@@ -39,7 +39,10 @@ fn test_app_initialization_with_dependencies() {
     // Create MenuConfigApp - this should now have all dependency tracking enabled
     let app = MenuConfigApp::new(ast.entries, symbol_table);
 
-    assert!(app.is_ok(), "MenuConfigApp should initialize successfully with dependency tracking");
+    assert!(
+        app.is_ok(),
+        "MenuConfigApp should initialize successfully with dependency tracking"
+    );
 
     println!("✓ MenuConfigApp initialized with enhanced dependency tracking");
 }

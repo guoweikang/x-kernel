@@ -1,68 +1,9 @@
-use crate::kconfig::ast::{Entry, Menu, Config, MenuConfig, Choice, Comment};
-use crate::kconfig::{SymbolType, Expr};
+use crate::kconfig::ast::{Choice, Comment, Config, Entry, Menu, MenuConfig};
+use crate::kconfig::{Expr, SymbolType};
 use std::collections::HashMap;
-use std::sync::OnceLock;
 use std::io::Write;
 
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
-
-// Helper function to check if debug logging is enabled
-// Cached to avoid repeated environment lookups
-fn is_debug_enabled() -> bool {
-    static DEBUG_ENABLED: OnceLock<bool> = OnceLock::new();
-    *DEBUG_ENABLED.get_or_init(|| std::env::var("XCONFIG_DEBUG").is_ok())
-}
-
-// Get debug log file handle (lazily opened)
-fn debug_log_file() -> Option<&'static std::sync::Mutex<std::fs::File>> {
-    static DEBUG_FILE: OnceLock<Option<std::sync::Mutex<std::fs::File>>> = OnceLock::new();
-    DEBUG_FILE.get_or_init(|| {
-        if !is_debug_enabled() {
-            return None;
-        }
-        
-        // Allow configuration via environment variable, otherwise use a secure default
-        let log_path = std::env::var("XCONFIG_DEBUG_LOG")
-            .unwrap_or_else(|_| {
-                // Try user-specific path first, fall back to /tmp with process ID
-                if let Ok(home) = std::env::var("HOME") {
-                    format!("{}/.xconfig_debug.log", home)
-                } else {
-                    format!("/tmp/xconfig_debug_{}.log", std::process::id())
-                }
-            });
-        
-        let mut options = std::fs::OpenOptions::new();
-        options.create(true).write(true).truncate(true);
-        
-        // Set restrictive permissions on Unix-like systems
-        #[cfg(unix)]
-        options.mode(0o600); // Only owner can read/write
-        
-        match options.open(&log_path) {
-            Ok(file) => Some(std::sync::Mutex::new(file)),
-            Err(e) => {
-                // Log error to stderr only if debug is explicitly enabled
-                eprintln!("Warning: Failed to open debug log at '{}': {}", log_path, e);
-                None
-            }
-        }
-    }).as_ref()
-}
-
-// Helper macro for debug logging to file
-macro_rules! debug_log {
-    ($($arg:tt)*) => {
-        if is_debug_enabled() {
-            if let Some(file_mutex) = debug_log_file() {
-                if let Ok(mut file) = file_mutex.lock() {
-                    let _ = writeln!(file, $($arg)*);
-                }
-            }
-        }
-    };
-}
+use crate::debug_log;
 
 // Helper function to normalize menu/comment IDs by replacing spaces with underscores
 // This ensures consistent ID format and prevents issues with space-containing keys
@@ -122,7 +63,11 @@ impl MenuItem {
             kind: MenuItemKind::Config {
                 symbol_type: config.symbol_type.clone(),
             },
-            label: config.properties.prompt.clone().unwrap_or_else(|| config.name.clone()),
+            label: config
+                .properties
+                .prompt
+                .clone()
+                .unwrap_or_else(|| config.name.clone()),
             value: None,
             is_visible: true,
             is_enabled: true,
@@ -130,22 +75,36 @@ impl MenuItem {
             depth,
             help_text: config.properties.help.clone(),
             depends_on: config.properties.depends.clone(),
-            selects: config.properties.select.iter().map(|(s, _)| s.clone()).collect(),
-            implies: config.properties.imply.iter().map(|(s, _)| s.clone()).collect(),
+            selects: config
+                .properties
+                .select
+                .iter()
+                .map(|(s, _)| s.clone())
+                .collect(),
+            implies: config
+                .properties
+                .imply
+                .iter()
+                .map(|(s, _)| s.clone())
+                .collect(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
             has_prompt: config.properties.prompt.is_some(),
         }
     }
-    
+
     pub fn from_menuconfig(config: &MenuConfig, depth: usize) -> Self {
         Self {
             id: config.name.clone(),
             kind: MenuItemKind::MenuConfig {
                 symbol_type: config.symbol_type.clone(),
             },
-            label: config.properties.prompt.clone().unwrap_or_else(|| config.name.clone()),
+            label: config
+                .properties
+                .prompt
+                .clone()
+                .unwrap_or_else(|| config.name.clone()),
             value: None,
             is_visible: true,
             is_enabled: true,
@@ -153,15 +112,25 @@ impl MenuItem {
             depth,
             help_text: config.properties.help.clone(),
             depends_on: config.properties.depends.clone(),
-            selects: config.properties.select.iter().map(|(s, _)| s.clone()).collect(),
-            implies: config.properties.imply.iter().map(|(s, _)| s.clone()).collect(),
+            selects: config
+                .properties
+                .select
+                .iter()
+                .map(|(s, _)| s.clone())
+                .collect(),
+            implies: config
+                .properties
+                .imply
+                .iter()
+                .map(|(s, _)| s.clone())
+                .collect(),
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
             has_prompt: config.properties.prompt.is_some(),
         }
     }
-    
+
     pub fn from_menu(menu: &Menu, depth: usize) -> Self {
         Self {
             id: normalize_id("menu", &menu.title),
@@ -184,7 +153,7 @@ impl MenuItem {
             has_prompt: true,
         }
     }
-    
+
     pub fn from_choice(choice: &Choice, depth: usize) -> Self {
         let options: Vec<String> = choice.options.iter().map(|c| c.name.clone()).collect();
         Self {
@@ -192,7 +161,10 @@ impl MenuItem {
             kind: MenuItemKind::Choice {
                 options: options.clone(),
             },
-            label: choice.prompt.clone().unwrap_or_else(|| "Choice".to_string()),
+            label: choice
+                .prompt
+                .clone()
+                .unwrap_or_else(|| "Choice".to_string()),
             value: None,
             is_visible: true,
             is_enabled: true,
@@ -208,7 +180,7 @@ impl MenuItem {
             has_prompt: choice.prompt.is_some(),
         }
     }
-    
+
     pub fn from_comment(comment: &Comment, depth: usize) -> Self {
         Self {
             id: normalize_id("comment", &comment.text),
@@ -271,71 +243,102 @@ impl ConfigState {
             original_values: HashMap::new(),
         }
     }
-    
+
     pub fn build_from_entries(entries: &[Entry]) -> Self {
         let mut state = Self::new();
         state.process_entries(entries, 0, "root");
         state.build_reverse_dependencies();
         state
     }
-    
+
     fn process_entries(&mut self, entries: &[Entry], depth: usize, parent_id: &str) {
         let mut items = Vec::new();
-        
-        debug_log!("[MenuTree] Building: parent_id=\"{}\", depth={}, entries_count={}", 
-                   parent_id, depth, entries.len());
-        
+
+        debug_log!(
+            "[MenuTree] Building: parent_id=\"{}\", depth={}, entries_count={}",
+            parent_id,
+            depth,
+            entries.len()
+        );
+
         // Process entries and collect them into items
         self.collect_items(entries, depth, parent_id, &mut items, None);
-        
-        debug_log!("[MenuTree] Inserting into menu_tree: key=\"{}\", items_count={}", 
-                   parent_id, items.len());
+
+        debug_log!(
+            "[MenuTree] Inserting into menu_tree: key=\"{}\", items_count={}",
+            parent_id,
+            items.len()
+        );
         for (i, item) in items.iter().enumerate() {
-            debug_log!("    [{}] id=\"{}\", label=\"{}\", kind={:?}", i, item.id, item.label, 
-                      match &item.kind {
-                          MenuItemKind::Menu { .. } => "Menu",
-                          MenuItemKind::Config { .. } => "Config",
-                          MenuItemKind::MenuConfig { .. } => "MenuConfig",
-                          MenuItemKind::Choice { .. } => "Choice",
-                          MenuItemKind::Comment { .. } => "Comment",
-                      });
+            debug_log!(
+                "    [{}] id=\"{}\", label=\"{}\", kind={:?}",
+                i,
+                item.id,
+                item.label,
+                match &item.kind {
+                    MenuItemKind::Menu { .. } => "Menu",
+                    MenuItemKind::Config { .. } => "Config",
+                    MenuItemKind::MenuConfig { .. } => "MenuConfig",
+                    MenuItemKind::Choice { .. } => "Choice",
+                    MenuItemKind::Comment { .. } => "Comment",
+                }
+            );
         }
-        
+
         if self.menu_tree.contains_key(parent_id) {
             let existing_items = &self.menu_tree[parent_id];
             debug_log!("⚠️  WARNING: Overwriting menu_tree key: \"{}\"", parent_id);
-            debug_log!("    Existing {} items will be replaced with {} new items", 
-                      existing_items.len(), items.len());
+            debug_log!(
+                "    Existing {} items will be replaced with {} new items",
+                existing_items.len(),
+                items.len()
+            );
             if !existing_items.is_empty() {
-                debug_log!("    First existing item: id=\"{}\", label=\"{}\"", 
-                          existing_items[0].id, existing_items[0].label);
+                debug_log!(
+                    "    First existing item: id=\"{}\", label=\"{}\"",
+                    existing_items[0].id,
+                    existing_items[0].label
+                );
             }
         }
-        
+
         self.menu_tree.insert(parent_id.to_string(), items.clone());
         self.all_items.extend(items);
     }
-    
+
     /// Recursively collects menu items from entries and appends them to the provided items vector.
-    /// 
+    ///
     /// This helper function is used to handle inline processing of `if` blocks, ensuring that
     /// entries within if blocks are collected into the same items vector as their siblings.
     /// This prevents menu tree overwrites that would occur if if-blocks were processed via
     /// separate calls to `process_entries()`.
-    /// 
+    ///
     /// The `if_condition` parameter is used to propagate if-block conditions to items inside them,
     /// combining with their existing depends_on expressions.
-    fn collect_items(&mut self, entries: &[Entry], depth: usize, parent_id: &str, items: &mut Vec<MenuItem>, if_condition: Option<&Expr>) {
-        debug_log!("[MenuTree] collect_items: parent_id=\"{}\", depth={}, entries_count={}, if_condition={}", 
-                   parent_id, depth, entries.len(), if_condition.is_some());
-        
+    fn collect_items(
+        &mut self,
+        entries: &[Entry],
+        depth: usize,
+        parent_id: &str,
+        items: &mut Vec<MenuItem>,
+        if_condition: Option<&Expr>,
+    ) {
+        debug_log!(
+            "[MenuTree] collect_items: parent_id=\"{}\", depth={}, entries_count={}, if_condition={}",
+            parent_id,
+            depth,
+            entries.len(),
+            if_condition.is_some()
+        );
+
         for entry in entries {
             match entry {
                 Entry::Config(config) => {
                     let mut item = MenuItem::from_config(config, depth);
                     // Combine if_condition with existing depends_on
                     if let Some(if_cond) = if_condition {
-                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                        item.depends_on =
+                            Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
                     }
                     items.push(item);
                 }
@@ -343,10 +346,11 @@ impl ConfigState {
                     let mut item = MenuItem::from_menuconfig(menuconfig, depth);
                     // Combine if_condition with existing depends_on
                     if let Some(if_cond) = if_condition {
-                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                        item.depends_on =
+                            Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
                     }
                     items.push(item.clone());
-                    
+
                     // MenuConfig can have sub-items (not in this simple version)
                     // In a full implementation, we'd recursively process
                 }
@@ -354,11 +358,12 @@ impl ConfigState {
                     let mut item = MenuItem::from_menu(menu, depth);
                     // Combine if_condition with existing depends_on
                     if let Some(if_cond) = if_condition {
-                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                        item.depends_on =
+                            Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
                     }
                     let menu_id = item.id.clone();
                     items.push(item);
-                    
+
                     // Process menu children with new parent_id and depth
                     self.process_entries(&menu.entries, depth + 1, &menu_id);
                 }
@@ -374,22 +379,26 @@ impl ConfigState {
                             "choice_unknown".to_string()
                         }
                     };
-                    
+
                     let mut item = MenuItem::from_choice(choice, depth);
                     item.id = choice_id.clone();
                     // Combine if_condition with existing depends_on
                     if let Some(if_cond) = if_condition {
-                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                        item.depends_on =
+                            Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
                     }
                     items.push(item);
-                    
+
                     // Add choice options as children with parent_choice set
                     for option in &choice.options {
                         let mut opt_item = MenuItem::from_config(option, depth + 1);
                         opt_item.parent_choice = Some(choice_id.clone());
                         // Combine if_condition with option's depends_on as well
                         if let Some(if_cond) = if_condition {
-                            opt_item.depends_on = Some(Self::combine_conditions(opt_item.depends_on.as_ref(), if_cond));
+                            opt_item.depends_on = Some(Self::combine_conditions(
+                                opt_item.depends_on.as_ref(),
+                                if_cond,
+                            ));
                         }
                         items.push(opt_item);
                     }
@@ -398,7 +407,8 @@ impl ConfigState {
                     let mut item = MenuItem::from_comment(comment, depth);
                     // Combine if_condition with existing depends_on
                     if let Some(if_cond) = if_condition {
-                        item.depends_on = Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
+                        item.depends_on =
+                            Some(Self::combine_conditions(item.depends_on.as_ref(), if_cond));
                     }
                     items.push(item);
                 }
@@ -410,7 +420,13 @@ impl ConfigState {
                     } else {
                         if_entry.condition.clone()
                     };
-                    self.collect_items(&if_entry.entries, depth, parent_id, items, Some(&combined_condition));
+                    self.collect_items(
+                        &if_entry.entries,
+                        depth,
+                        parent_id,
+                        items,
+                        Some(&combined_condition),
+                    );
                 }
                 Entry::MainMenu(_title) => {
                     // Skip mainmenu for now
@@ -421,48 +437,46 @@ impl ConfigState {
             }
         }
     }
-    
+
     /// Combine two expressions with AND logic
     /// If existing_depends is None, returns new_condition
     /// If existing_depends is Some, returns (existing_depends AND new_condition)
     fn combine_conditions(existing_depends: Option<&Expr>, new_condition: &Expr) -> Expr {
         match existing_depends {
             None => new_condition.clone(),
-            Some(existing) => Expr::And(Box::new(existing.clone()), Box::new(new_condition.clone())),
+            Some(existing) => {
+                Expr::And(Box::new(existing.clone()), Box::new(new_condition.clone()))
+            }
         }
     }
-    
+
     pub fn get_items_for_path(&self, path: &[String]) -> Vec<MenuItem> {
         let key = if path.is_empty() {
             "root".to_string()
         } else {
             path.last().unwrap().clone()
         };
-        
-        debug_log!("[MenuTree] get_items_for_path: key=\"{}\", path={:?}", key, path);
-        
+
+        debug_log!("[GET_ITEMS] Called with path={:?}, key='{}'", path, key);
+
         let items = self.menu_tree.get(&key).cloned().unwrap_or_else(|| {
-            debug_log!("❌ Key not found in menu_tree: \"{}\"", key);
-            debug_log!("Available keys: {:?}", self.menu_tree.keys().collect::<Vec<_>>());
+            debug_log!("    ❌ Key '{}' not found in menu_tree", key);
+            debug_log!(
+                "    Available keys: {:?}",
+                self.menu_tree.keys().collect::<Vec<_>>()
+            );
             Vec::new()
         });
-        
-        debug_log!("📋 Returning {} items for key \"{}\"", items.len(), key);
-        for item in items.iter().take(3) {
-            debug_log!("    - {}: {}", item.id, item.label);
-        }
-        if items.len() > 3 {
-            debug_log!("    ... and {} more items", items.len() - 3);
-        }
-        
+
+        debug_log!("    ✅ Returning {} items for key '{}'", items.len(), key);
         items
     }
-    
+
     fn build_reverse_dependencies(&mut self) {
         // Build maps of reverse dependencies
         let mut selected_by_map: HashMap<String, Vec<String>> = HashMap::new();
         let mut implied_by_map: HashMap<String, Vec<String>> = HashMap::new();
-        
+
         // First pass: collect all reverse dependencies
         for item in &self.all_items {
             for select in &item.selects {
@@ -478,7 +492,7 @@ impl ConfigState {
                     .push(item.id.clone());
             }
         }
-        
+
         // Second pass: update all items with reverse dependencies
         for item in &mut self.all_items {
             if let Some(selected_by) = selected_by_map.get(&item.id) {
@@ -488,7 +502,7 @@ impl ConfigState {
                 item.implied_by = implied_by.clone();
             }
         }
-        
+
         // Third pass: update menu_tree items with reverse dependencies
         for (_, items) in self.menu_tree.iter_mut() {
             for item in items {

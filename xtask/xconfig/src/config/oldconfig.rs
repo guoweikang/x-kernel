@@ -10,8 +10,8 @@ pub struct OldConfigLoader {
 }
 
 pub struct ConfigChanges {
-    pub new_symbols: Vec<String>,      // Symbols added in new Kconfig
-    pub removed_symbols: Vec<String>,  // Symbols removed from Kconfig
+    pub new_symbols: Vec<String>,     // Symbols added in new Kconfig
+    pub removed_symbols: Vec<String>, // Symbols removed from Kconfig
 }
 
 impl ConfigChanges {
@@ -21,11 +21,11 @@ impl ConfigChanges {
             removed_symbols: Vec::new(),
         }
     }
-    
+
     pub fn has_changes(&self) -> bool {
         !self.new_symbols.is_empty() || !self.removed_symbols.is_empty()
     }
-    
+
     pub fn print_summary(&self) {
         if !self.new_symbols.is_empty() {
             println!("🆕 New configuration options detected:");
@@ -34,7 +34,7 @@ impl ConfigChanges {
             }
             println!();
         }
-        
+
         if !self.removed_symbols.is_empty() {
             println!("⚠️  Removed configuration options (will be ignored):");
             for symbol in &self.removed_symbols {
@@ -42,7 +42,7 @@ impl ConfigChanges {
             }
             println!();
         }
-        
+
         if self.has_changes() {
             println!("💡 Use 'menuconfig' to review and configure new options.");
         }
@@ -56,18 +56,20 @@ impl OldConfigLoader {
             srctree: srctree.as_ref().to_string_lossy().to_string(),
         }
     }
-    
+
     /// Load old config and merge with current Kconfig definitions
     /// Returns: (merged SymbolTable, ConfigChanges)
-    pub fn load_and_merge(&self, config_path: impl AsRef<Path>) 
-        -> Result<(SymbolTable, ConfigChanges)> {
+    pub fn load_and_merge(
+        &self,
+        config_path: impl AsRef<Path>,
+    ) -> Result<(SymbolTable, ConfigChanges)> {
         // Parse current Kconfig to get all defined symbols
         let mut parser = Parser::new(&self.kconfig_path, &self.srctree)?;
         let ast = parser.parse()?;
-        
+
         // Build symbol table from Kconfig
         let mut symbols = SymbolTable::new();
-        
+
         // Extract symbols from AST
         for entry in &ast.entries {
             if let crate::kconfig::ast::Entry::Config(config) = entry {
@@ -76,20 +78,20 @@ impl OldConfigLoader {
                 symbols.add_symbol(clean_name.to_string(), config.symbol_type.clone());
             }
         }
-        
+
         // Get current symbol names
         let current_symbols: HashSet<String> = symbols
             .all_symbols()
             .map(|(name, _)| name.clone())
             .collect();
-        
+
         // Read old config file
         let old_config = ConfigReader::read(config_path)?;
         let old_symbol_names: HashSet<String> = old_config.keys().cloned().collect();
-        
+
         // Detect differences
         let mut changes = ConfigChanges::new();
-        
+
         // New symbols = current - old
         for name in &current_symbols {
             if !old_symbol_names.contains(name) {
@@ -97,14 +99,14 @@ impl OldConfigLoader {
                 symbols.mark_as_new(name);
             }
         }
-        
+
         // Removed symbols = old - current
         for name in &old_symbol_names {
             if !current_symbols.contains(name) {
                 changes.removed_symbols.push(name.clone());
             }
         }
-        
+
         // Apply old config values to matching symbols
         for (name, value) in old_config {
             if current_symbols.contains(&name) {
@@ -113,7 +115,7 @@ impl OldConfigLoader {
             }
             // Silently ignore removed symbols
         }
-        
+
         Ok((symbols, changes))
     }
 }
