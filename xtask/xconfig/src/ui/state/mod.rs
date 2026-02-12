@@ -19,6 +19,7 @@ pub struct MenuItem {
     pub selected_by: Vec<String>,
     pub implied_by: Vec<String>,
     pub parent_choice: Option<String>,
+    pub has_prompt: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +67,7 @@ impl MenuItem {
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
+            has_prompt: config.properties.prompt.is_some(),
         }
     }
     
@@ -88,6 +90,7 @@ impl MenuItem {
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
+            has_prompt: config.properties.prompt.is_some(),
         }
     }
     
@@ -110,6 +113,7 @@ impl MenuItem {
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
+            has_prompt: true,
         }
     }
     
@@ -133,6 +137,7 @@ impl MenuItem {
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
+            has_prompt: choice.prompt.is_some(),
         }
     }
     
@@ -155,6 +160,7 @@ impl MenuItem {
             selected_by: Vec::new(),
             implied_by: Vec::new(),
             parent_choice: None,
+            has_prompt: true,
         }
     }
 }
