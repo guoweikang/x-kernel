@@ -326,17 +326,21 @@ fn split_tuples(s: &str) -> Result<Vec<&str>, String> {
     let mut tuples = Vec::new();
     let mut start = 0;
     let mut depth = 0;
+    let mut in_quotes = false;
     let chars: Vec<char> = s.chars().collect();
     
     for i in 0..chars.len() {
         match chars[i] {
-            '(' => {
+            '"' if i == 0 || chars[i-1] != '\\' => {
+                in_quotes = !in_quotes;
+            }
+            '(' if !in_quotes => {
                 if depth == 0 {
                     start = i;
                 }
                 depth += 1;
             }
-            ')' => {
+            ')' if !in_quotes => {
                 depth -= 1;
                 if depth == 0 {
                     tuples.push(&s[start..=i]);
@@ -1007,5 +1011,64 @@ fn main() {
             print_help();
             process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_tuples_basic() {
+        let input = r#"("key1", 123), ("key2", 456)"#;
+        let result = split_tuples(input);
+        
+        assert!(result.is_ok());
+        let tuples = result.unwrap();
+        assert_eq!(tuples.len(), 2);
+        assert_eq!(tuples[0], r#"("key1", 123)"#);
+        assert_eq!(tuples[1], r#"("key2", 456)"#);
+    }
+
+    #[test]
+    fn test_split_tuples_with_quoted_parens() {
+        let input = r#"("(test)", 123), ("normal", 456)"#;
+        let result = split_tuples(input);
+        
+        assert!(result.is_ok());
+        let tuples = result.unwrap();
+        assert_eq!(tuples.len(), 2);
+        assert_eq!(tuples[0], r#"("(test)", 123)"#);
+        assert_eq!(tuples[1], r#"("normal", 456)"#);
+    }
+
+    #[test]
+    fn test_split_tuples_nested_parens() {
+        let input = r#"(1, (2, 3)), (4, 5)"#;
+        let result = split_tuples(input);
+        
+        assert!(result.is_ok());
+        let tuples = result.unwrap();
+        assert_eq!(tuples.len(), 2);
+        assert_eq!(tuples[0], r#"(1, (2, 3))"#);
+        assert_eq!(tuples[1], r#"(4, 5)"#);
+    }
+
+    #[test]
+    fn test_split_tuples_unmatched_opening() {
+        let input = r#"("key", 123"#;
+        let result = split_tuples(input);
+        
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Unmatched opening parenthesis");
+    }
+
+    #[test]
+    fn test_split_tuples_unmatched_closing() {
+        let input = r#"("key", 123))"#;
+        let result = split_tuples(input);
+        
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Unmatched closing parenthesis");
     }
 }
