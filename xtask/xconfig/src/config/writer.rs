@@ -66,7 +66,16 @@ impl ConfigWriter {
                     }
                 }
             } else {
-                writeln!(file, "# {} is not set", clean_name)?;
+                // Only use "is not set" for bool/tristate types
+                use crate::kconfig::ast::SymbolType;
+                match symbol.symbol_type {
+                    SymbolType::Bool | SymbolType::Tristate => {
+                        writeln!(file, "# {} is not set", clean_name)?;
+                    }
+                    _ => {
+                        // For other types (string, int, hex, range), skip writing to keep the config clean
+                    }
+                }
             }
         }
 

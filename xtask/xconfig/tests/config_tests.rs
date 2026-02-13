@@ -236,3 +236,72 @@ KERNEL_VERSION="0.0.1"
     assert_eq!(config.get("KERNEL_VERSION"), Some(&"0.0.1".to_string()));
     assert_eq!(config.get("DEBUG"), Some(&"n".to_string()));
 }
+
+#[test]
+fn test_config_writer_none_values_by_type() {
+    // Test that when symbol value is None:
+    // - Bool/Tristate types write "# <name> is not set"
+    // - Other types (String, Int, Hex, Range) skip writing
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("test.config");
+
+    let mut symbols = SymbolTable::new();
+
+    // Add symbols with None values
+    symbols.add_symbol("BOOL_NONE".to_string(), SymbolType::Bool);
+    // value is None by default
+
+    symbols.add_symbol("TRISTATE_NONE".to_string(), SymbolType::Tristate);
+    // value is None by default
+
+    symbols.add_symbol("STRING_NONE".to_string(), SymbolType::String);
+    // value is None by default
+
+    symbols.add_symbol("INT_NONE".to_string(), SymbolType::Int);
+    // value is None by default
+
+    symbols.add_symbol("HEX_NONE".to_string(), SymbolType::Hex);
+    // value is None by default
+
+    symbols.add_symbol("RANGE_NONE".to_string(), SymbolType::Range);
+    // value is None by default
+
+    // Add some symbols with values for comparison
+    symbols.add_symbol("BOOL_SET".to_string(), SymbolType::Bool);
+    symbols.set_value("BOOL_SET", "y".to_string());
+
+    ConfigWriter::write(&config_path, &symbols).unwrap();
+
+    let content = fs::read_to_string(&config_path).unwrap();
+
+    // Bool and Tristate with None should write "is not set"
+    assert!(
+        content.contains("# BOOL_NONE is not set"),
+        "Bool with None should write 'is not set'"
+    );
+    assert!(
+        content.contains("# TRISTATE_NONE is not set"),
+        "Tristate with None should write 'is not set'"
+    );
+
+    // Other types with None should NOT appear in the config
+    assert!(
+        !content.contains("STRING_NONE"),
+        "String with None should be skipped"
+    );
+    assert!(
+        !content.contains("INT_NONE"),
+        "Int with None should be skipped"
+    );
+    assert!(
+        !content.contains("HEX_NONE"),
+        "Hex with None should be skipped"
+    );
+    assert!(
+        !content.contains("RANGE_NONE"),
+        "Range with None should be skipped"
+    );
+
+    // Symbol with value should appear
+    assert!(content.contains("BOOL_SET=y"), "Bool with value should appear");
+}
