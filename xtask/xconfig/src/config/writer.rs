@@ -15,7 +15,11 @@ impl ConfigWriter {
         writeln!(file, "# Rust Kbuild Configuration")?;
         writeln!(file, "#")?;
 
-        for (name, symbol) in symbols.all_symbols() {
+        // Sort keys alphabetically for stable output
+        let mut sorted_symbols: Vec<_> = symbols.all_symbols().collect();
+        sorted_symbols.sort_by(|(name_a, _), (name_b, _)| name_a.cmp(name_b));
+
+        for (name, symbol) in sorted_symbols {
             let clean_name = name.strip_prefix("CONFIG_").unwrap_or(name);
 
             if let Some(value) = &symbol.value {
