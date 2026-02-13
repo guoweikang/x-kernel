@@ -321,6 +321,168 @@ fn generate_features(config: &HashMap<String, String>) -> Vec<String> {
     features
 }
 
+/// Split string into individual tuples, handling nested parentheses
+fn split_tuples(s: &str) -> Result<Vec<&str>, String> {
+    let mut tuples = Vec::new();
+    let mut start = 0;
+    let mut depth = 0;
+    let chars: Vec<char> = s.chars().collect();
+    
+    for i in 0..chars.len() {
+        match chars[i] {
+            '(' => {
+                if depth == 0 {
+                    start = i;
+                }
+                depth += 1;
+            }
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    tuples.push(&s[start..=i]);
+                }
+                if depth < 0 {
+                    return Err("Unmatched closing parenthesis".to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    if depth != 0 {
+        return Err("Unmatched opening parenthesis".to_string());
+    }
+    
+    Ok(tuples)
+}
+
+/// Parse single tuple string and return element list
+fn parse_single_tuple(tuple_str: &str) -> Result<Vec<String>, String> {
+    let tuple_str = tuple_str.trim();
+    if !tuple_str.starts_with('(') || !tuple_str.ends_with(')') {
+        return Err(format!("Invalid tuple format: {}", tuple_str));
+    }
+    
+    let inner = &tuple_str[1..tuple_str.len()-1];
+    let mut elements = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0;
+    let mut in_quotes = false;
+    
+    for ch in inner.chars() {
+        match ch {
+            '"' => {
+                in_quotes = !in_quotes;
+                current.push(ch);
+            }
+            ',' if depth == 0 && !in_quotes => {
+                elements.push(current.trim().to_string());
+                current.clear();
+            }
+            '(' | '[' if !in_quotes => {
+                depth += 1;
+                current.push(ch);
+            }
+            ')' | ']' if !in_quotes => {
+                depth -= 1;
+                current.push(ch);
+            }
+            _ => current.push(ch),
+        }
+    }
+    
+    if !current.trim().is_empty() {
+        elements.push(current.trim().to_string());
+    }
+    
+    Ok(elements)
+}
+
+/// Infer Rust types for each element in a tuple
+fn infer_tuple_types(elements: &[String]) -> Vec<String> {
+    elements.iter().map(|elem| {
+        let trimmed = elem.trim();
+        
+        // String (with quotes)
+        if (trimmed.starts_with('"') && trimmed.ends_with('"')) 
+            || (trimmed.starts_with('\'') && trimmed.ends_with('\'')) {
+            return "&str".to_string();
+        }
+        
+        // Hexadecimal
+        if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+            // Try to parse to determine if we need a larger type
+            if let Ok(val) = u64::from_str_radix(&trimmed[2..].replace('_', ""), 16) {
+                if val > u32::MAX as u64 {
+                    return "usize".to_string();
+                }
+            }
+            return "usize".to_string();
+        }
+        
+        // Negative number
+        if trimmed.starts_with('-') {
+            return "i64".to_string();
+        }
+        
+        // Positive integer
+        if trimmed.parse::<u64>().is_ok() {
+            return "usize".to_string();
+        }
+        
+        // Default to string
+        "&str".to_string()
+    }).collect()
+}
+
+/// Format tuple elements as Rust code
+fn format_tuple_elements(elements: &[String], types: &[String]) -> String {
+    let formatted: Vec<String> = elements.iter().zip(types.iter()).map(|(elem, typ)| {
+        let trimmed = elem.trim();
+        
+        if typ == "&str" {
+            // String type
+            if trimmed.starts_with('"') && trimmed.ends_with('"') {
+                trimmed.to_string()
+            } else {
+                format!("\"{}\"", trimmed)
+            }
+        } else {
+            // Numeric type, keep as-is
+            trimmed.to_string()
+        }
+    }).collect();
+    
+    format!("({})", formatted.join(", "))
+}
+
+/// Parse tuple array and return (tuple_type, rust_code)
+fn parse_tuple_array(inner: &str) -> Result<(String, String), String> {
+    // 1. Split into individual tuples
+    let tuples = split_tuples(inner)?;
+    
+    if tuples.is_empty() {
+        return Err("No tuples found".to_string());
+    }
+    
+    // 2. Parse first tuple to determine types
+    let first_tuple = parse_single_tuple(tuples[0])?;
+    let types = infer_tuple_types(&first_tuple);
+    
+    // 3. Generate Rust type string
+    let tuple_type = format!("({})", types.join(", "));
+    
+    // 4. Generate all tuples' Rust code
+    let mut rust_lines = Vec::new();
+    for tuple_str in tuples {
+        let elements = parse_single_tuple(tuple_str)?;
+        let formatted = format_tuple_elements(&elements, &types);
+        rust_lines.push(format!("    {}", formatted));
+    }
+    
+    Ok((tuple_type, rust_lines.join(",\n")))
+}
+
 /// Generate config.rs file with constants
 /// Handles three types:
 /// - Int: decimal numbers (e.g., 123)
@@ -355,6 +517,25 @@ fn generate_config_rs(
             if inner.is_empty() {
                 // Empty array
                 content.push_str(&format!("pub const {}: &[&str] = &[];\n\n", key));
+                continue;
+            }
+            
+            // Check if it's a tuple array: look for '(' character
+            if inner.contains('(') && inner.contains(')') {
+                // This is a tuple array
+                match parse_tuple_array(inner) {
+                    Ok((tuple_type, rust_code)) => {
+                        content.push_str(&format!(
+                            "pub const {}: &[{}] = &[\n{}\n];\n\n",
+                            key, tuple_type, rust_code
+                        ));
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Warning: Failed to parse tuple array for {}: {}", key, e);
+                        // Fallback to string
+                        content.push_str(&format!("pub const {}: &str = \"{}\";\n\n", key, value));
+                    }
+                }
                 continue;
             }
             
