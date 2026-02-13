@@ -135,3 +135,19 @@ fn test_lexer_array_hex_values() {
     assert!(matches!(lexer.next_token().unwrap(), Token::RBracket));
 }
 
+
+#[test]
+fn test_lexer_hex_with_underscores() {
+    let input = "0x1000_0000 0xfe00_0000".to_string();
+    let mut lexer = Lexer::new(input, PathBuf::from("test"));
+
+    match lexer.next_token().unwrap() {
+        Token::Identifier(s) => assert_eq!(s, "0x1000_0000"),
+        _ => panic!("Expected Identifier for hex with underscores"),
+    }
+
+    match lexer.next_token().unwrap() {
+        Token::Identifier(s) => assert_eq!(s, "0xfe00_0000"),
+        _ => panic!("Expected Identifier for hex with underscores"),
+    }
+}
