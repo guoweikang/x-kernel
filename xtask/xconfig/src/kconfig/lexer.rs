@@ -273,9 +273,9 @@ impl Lexer {
             self.advance();
         }
         
-        // Read hex digits
+        // Read hex digits AND underscores
         while let Some(ch) = self.current_char() {
-            if ch.is_ascii_hexdigit() {
+            if ch.is_ascii_hexdigit() || ch == '_' {
                 result.push(ch);
                 self.advance();
             } else {
