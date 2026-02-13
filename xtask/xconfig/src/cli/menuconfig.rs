@@ -30,7 +30,30 @@ pub fn menuconfig_command(kconfig: PathBuf, srctree: PathBuf) -> Result<()> {
         println!("Loading existing .config...");
         let config_values = ConfigReader::read(".config")?;
         for (name, value) in config_values {
-            symbol_table.set_value(&name, value);
+            // For symbols with types other than bool/tristate, don't override defaults
+            // with "n" (from "# XXX is not set" comments) as "n" is not meaningful
+            // for hex/int/string types. This preserves defaults for new symbols.
+            if value == "n" {
+                // Check if this symbol is bool or tristate
+                if let Some(symbol) = symbol_table.get_symbol(&name) {
+                    use crate::kconfig::ast::SymbolType;
+                    match symbol.symbol_type {
+                        SymbolType::Bool | SymbolType::Tristate => {
+                            // For bool/tristate, "n" is valid, apply it
+                            symbol_table.set_value(&name, value);
+                        }
+                        _ => {
+                            // For hex/int/string/range, skip "n" values
+                            // This preserves the default value
+                        }
+                    }
+                } else {
+                    // Symbol not found, skip
+                }
+            } else {
+                // For non-"n" values, always apply from config
+                symbol_table.set_value(&name, value);
+            }
         }
     } else {
         println!("No existing .config found, using defaults");
