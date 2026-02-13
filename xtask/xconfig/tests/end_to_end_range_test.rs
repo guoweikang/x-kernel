@@ -40,7 +40,9 @@ config TEST_MMIO_BASE
                 // Extract default value if present
                 if !config.properties.defaults.is_empty() {
                     if let Expr::Const(default_value) = &config.properties.defaults[0].value {
-                        // Normalize spaces for consistency
+                        // Normalize spaces for consistency: the parser adds spaces after commas
+                        // in array literals "[0x1000_0000, 0x2000_0000]" but we want to store
+                        // and compare without spaces "[0x1000_0000,0x2000_0000]"
                         let normalized = default_value.replace(" ", "");
                         symbols.set_value("TEST_MMIO_BASE", normalized);
                     }

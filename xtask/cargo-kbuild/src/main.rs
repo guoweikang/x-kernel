@@ -331,8 +331,12 @@ fn split_tuples(s: &str) -> Result<Vec<&str>, String> {
     
     for i in 0..chars.len() {
         match chars[i] {
-            '"' if i == 0 || chars[i-1] != '\\' => {
-                in_quotes = !in_quotes;
+            '"' => {
+                // Check if this quote is escaped by looking at the previous character
+                let is_escaped = i > 0 && chars[i-1] == '\\';
+                if !is_escaped {
+                    in_quotes = !in_quotes;
+                }
             }
             '(' if !in_quotes => {
                 if depth == 0 {
@@ -1070,5 +1074,17 @@ mod tests {
         
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Unmatched closing parenthesis");
+    }
+
+    #[test]
+    fn test_split_tuples_with_escaped_quotes() {
+        let input = r#"("key with \" quote", 123), ("normal", 456)"#;
+        let result = split_tuples(input);
+        
+        assert!(result.is_ok());
+        let tuples = result.unwrap();
+        assert_eq!(tuples.len(), 2);
+        assert_eq!(tuples[0], r#"("key with \" quote", 123)"#);
+        assert_eq!(tuples[1], r#"("normal", 456)"#);
     }
 }
