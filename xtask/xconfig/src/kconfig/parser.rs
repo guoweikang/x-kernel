@@ -338,7 +338,13 @@ impl Parser {
                 }
                 Token::Default => {
                     self.advance()?;
-                    let value = self.parse_expr()?;
+                    
+                    // Check if it's an array literal
+                    let value = if matches!(self.current_context().current_token, Token::LBracket) {
+                        self.parse_array_literal()?
+                    } else {
+                        self.parse_expr()?
+                    };
 
                     // Check for optional 'if' condition
                     let condition = if matches!(self.current_context().current_token, Token::If) {
@@ -701,6 +707,78 @@ impl Parser {
             self.parse_string()
         } else {
             Err(KconfigError::Parse("No prompt found".to_string()))
+        }
+    }
+
+    fn parse_array_literal(&mut self) -> Result<Expr> {
+        self.expect(Token::LBracket)?;
+        
+        let mut elements = Vec::new();
+        let mut content = String::from("[");
+        
+        loop {
+            self.skip_newlines()?;
+            
+            // Check if we've reached the end of the array
+            match &self.current_context().current_token {
+                Token::RBracket => {
+                    self.advance()?; // consume ]
+                    content.push(']');
+                    break;
+                }
+                Token::Eof => {
+                    return Err(KconfigError::Syntax {
+                        file: self.current_file.clone(),
+                        line: self.current_context().lexer.current_line(),
+                        message: "Unexpected EOF in array literal".to_string(),
+                    });
+                }
+                _ => {}
+            }
+            
+            // Parse array element
+            let element = self.parse_array_element()?;
+            if !content.ends_with('[') {
+                content.push_str(", ");
+            }
+            content.push_str(&element);
+            elements.push(element);
+            
+            // Check for comma or end of array
+            self.skip_newlines()?;
+            if matches!(self.current_context().current_token, Token::Comma) {
+                self.advance()?; // consume comma
+                // Continue to next element
+            }
+            // Allow whitespace-separated elements (no comma required)
+        }
+        
+        // Return the entire array as a Const expression
+        Ok(Expr::Const(content))
+    }
+
+    fn parse_array_element(&mut self) -> Result<String> {
+        let token = self.current_context().current_token.clone();
+        
+        match token {
+            Token::Number(n) => {
+                self.advance()?;
+                Ok(n.to_string())
+            }
+            Token::StringLit(s) => {
+                self.advance()?;
+                Ok(format!("\"{}\"", s))
+            }
+            Token::Identifier(s) => {
+                self.advance()?;
+                // Handle hex numbers or other identifiers
+                Ok(s)
+            }
+            _ => Err(KconfigError::Syntax {
+                file: self.current_file.clone(),
+                line: self.current_context().lexer.current_line(),
+                message: format!("Unexpected token in array: {:?}", token),
+            }),
         }
     }
 }
