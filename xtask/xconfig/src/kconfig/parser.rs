@@ -738,7 +738,7 @@ impl Parser {
             
             // Parse array element
             let element = self.parse_array_element()?;
-            if !elements.is_empty() {
+            if !content.ends_with('[') {
                 content.push_str(", ");
             }
             content.push_str(&element);
@@ -749,9 +749,6 @@ impl Parser {
             if matches!(self.current_context().current_token, Token::Comma) {
                 self.advance()?; // consume comma
                 // Continue to next element
-            } else if matches!(self.current_context().current_token, Token::RBracket) {
-                // Array end, will be handled in next iteration
-                continue;
             }
             // Allow whitespace-separated elements (no comma required)
         }
