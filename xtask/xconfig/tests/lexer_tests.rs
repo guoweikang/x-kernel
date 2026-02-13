@@ -85,3 +85,44 @@ fn test_lexer_comments() {
         _ => panic!("Expected Identifier"),
     }
 }
+
+#[test]
+fn test_lexer_punctuation() {
+    let input = "( ) [ ] ,".to_string();
+    let mut lexer = Lexer::new(input, PathBuf::from("test"));
+
+    assert!(matches!(lexer.next_token().unwrap(), Token::LParen));
+    assert!(matches!(lexer.next_token().unwrap(), Token::RParen));
+    assert!(matches!(lexer.next_token().unwrap(), Token::LBracket));
+    assert!(matches!(lexer.next_token().unwrap(), Token::RBracket));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
+}
+
+#[test]
+fn test_lexer_array_literal() {
+    let input = "[1, 2, 3]".to_string();
+    let mut lexer = Lexer::new(input, PathBuf::from("test"));
+
+    assert!(matches!(lexer.next_token().unwrap(), Token::LBracket));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Number(1)));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Number(2)));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Number(3)));
+    assert!(matches!(lexer.next_token().unwrap(), Token::RBracket));
+}
+
+#[test]
+fn test_lexer_array_hex_values() {
+    let input = "[0x10, 0x20, 0x30]".to_string();
+    let mut lexer = Lexer::new(input, PathBuf::from("test"));
+
+    assert!(matches!(lexer.next_token().unwrap(), Token::LBracket));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Number(16))); // 0x10
+    assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Number(32))); // 0x20
+    assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
+    assert!(matches!(lexer.next_token().unwrap(), Token::Number(48))); // 0x30
+    assert!(matches!(lexer.next_token().unwrap(), Token::RBracket));
+}
+

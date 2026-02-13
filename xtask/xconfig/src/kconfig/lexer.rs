@@ -56,8 +56,11 @@ pub enum Token {
     Number(i64),
 
     // Punctuation
-    LParen, // (
-    RParen, // )
+    LParen,   // (
+    RParen,   // )
+    LBracket, // [
+    RBracket, // ]
+    Comma,    // ,
 
     // Special
     Newline,
@@ -295,6 +298,21 @@ impl Lexer {
         if ch == ')' {
             self.advance();
             return Ok(Token::RParen);
+        }
+
+        if ch == '[' {
+            self.advance();
+            return Ok(Token::LBracket);
+        }
+
+        if ch == ']' {
+            self.advance();
+            return Ok(Token::RBracket);
+        }
+
+        if ch == ',' {
+            self.advance();
+            return Ok(Token::Comma);
         }
 
         if ch == '=' {
