@@ -7,6 +7,7 @@ pub enum SymbolType {
     String,
     Int,
     Hex,
+    Range,
 }
 
 #[derive(Debug, Clone, PartialEq)]

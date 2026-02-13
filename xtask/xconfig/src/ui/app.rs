@@ -169,6 +169,7 @@ impl MenuConfigApp {
                 SymbolType::String => ConfigValue::String(String::new()),
                 SymbolType::Int => ConfigValue::Int(0),
                 SymbolType::Hex => ConfigValue::Hex("0x0".to_string()),
+                SymbolType::Range => ConfigValue::Range("[]".to_string()),
             };
             item.value = Some(default_val);
             false
@@ -204,6 +205,14 @@ impl MenuConfigApp {
                         }
                         Err(_) => ConfigValue::Hex(trimmed.to_string()), // Keep as-is if invalid
                     }
+                }
+            }
+            SymbolType::Range => {
+                let trimmed = value.trim();
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    ConfigValue::Range(trimmed.to_string())
+                } else {
+                    ConfigValue::Range(format!("[{}]", trimmed))
                 }
             }
         }
@@ -485,6 +494,7 @@ impl MenuConfigApp {
             Some(ConfigValue::String(s)) if !s.is_empty() => format!("= \"{}\"", s),
             Some(ConfigValue::Int(i)) => format!("= {}", i),
             Some(ConfigValue::Hex(h)) => format!("= {}", h),
+            Some(ConfigValue::Range(r)) => format!("= {}", r),
             _ => String::new(),
         }
     }
@@ -537,6 +547,7 @@ impl MenuConfigApp {
                 ConfigValue::String(s) => format!("Value: \"{}\"", s),
                 ConfigValue::Int(i) => format!("Value: {}", i),
                 ConfigValue::Hex(h) => format!("Value: {}", h),
+                ConfigValue::Range(r) => format!("Value: {}", r),
             };
             text_lines.push(Line::from(value_str));
             text_lines.push(Line::from(""));
@@ -1364,6 +1375,7 @@ impl MenuConfigApp {
             ConfigValue::String(s) => format!("\"{}\"", s),
             ConfigValue::Int(i) => i.to_string(),
             ConfigValue::Hex(h) => h,
+            ConfigValue::Range(r) => r,
         };
 
         self.symbol_table
@@ -1798,6 +1810,7 @@ impl MenuConfigApp {
             ConfigValue::String(s) => format!("\"{}\"", s),
             ConfigValue::Int(i) => i.to_string(),
             ConfigValue::Hex(h) => h.clone(),
+            ConfigValue::Range(r) => r.clone(),
             _ => return Ok(()),
         };
 

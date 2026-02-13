@@ -348,6 +348,67 @@ fn generate_config_rs(
 
         content.push_str(&format!("#[allow(dead_code)]\n"));
 
+        // Check if it's a range value (starts with [ and ends with ])
+        if value.starts_with('[') && value.ends_with(']') {
+            let inner = &value[1..value.len()-1];
+            
+            if inner.is_empty() {
+                // Empty array
+                content.push_str(&format!("pub const {}: &[&str] = &[];\n\n", key));
+                continue;
+            }
+            
+            let items: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+            
+            // Determine element type from first item (guaranteed to exist since inner is not empty)
+            let first_item = items[0];
+            
+            if first_item.starts_with("0x") || first_item.starts_with("0X") {
+                // Hex array - validate all items are hex
+                let mut valid_items: Vec<String> = Vec::new();
+                let mut has_invalid = false;
+                for s in &items {
+                    let trimmed = s.trim();
+                    if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                        valid_items.push(format!("\"{}\"", trimmed));
+                    } else {
+                        eprintln!("⚠️  Warning: Skipping non-hex item '{}' in hex array {}", trimmed, key);
+                        has_invalid = true;
+                    }
+                }
+                if has_invalid {
+                    eprintln!("⚠️  Warning: {} has mixed types - only hex values will be included", key);
+                }
+                content.push_str(&format!("pub const {}: &[&str] = &[{}];\n\n", 
+                    key, valid_items.join(", ")));
+            } else if first_item.parse::<i64>().is_ok() {
+                // Integer array - validate all items are integers
+                let mut valid_items: Vec<String> = Vec::new();
+                let mut has_invalid = false;
+                for s in &items {
+                    if s.trim().parse::<i64>().is_ok() {
+                        valid_items.push(s.trim().to_string());
+                    } else {
+                        eprintln!("⚠️  Warning: Skipping non-integer item '{}' in integer array {}", s.trim(), key);
+                        has_invalid = true;
+                    }
+                }
+                if has_invalid {
+                    eprintln!("⚠️  Warning: {} has mixed types - only integer values will be included", key);
+                }
+                content.push_str(&format!("pub const {}: &[i64] = &[{}];\n\n", 
+                    key, valid_items.join(", ")));
+            } else {
+                // String array - all items treated as strings
+                let str_items: Vec<String> = items.iter()
+                    .map(|s| format!("\"{}\"", s.trim().trim_matches('"')))
+                    .collect();
+                content.push_str(&format!("pub const {}: &[&str] = &[{}];\n\n", 
+                    key, str_items.join(", ")));
+            }
+            continue;
+        }
+
         // Check if it's a hex value (starts with 0x or 0X)
         if value.starts_with("0x") || value.starts_with("0X") {
             // Parse and validate as u64 hex
