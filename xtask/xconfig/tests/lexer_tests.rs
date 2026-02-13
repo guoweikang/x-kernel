@@ -68,8 +68,8 @@ fn test_lexer_numbers() {
     }
 
     match lexer.next_token().unwrap() {
-        Token::Number(n) => assert_eq!(n, 26), // 0x1a = 26
-        _ => panic!("Expected Number"),
+        Token::Identifier(s) => assert_eq!(s, "0x1a"), // Hex numbers now returned as identifiers
+        _ => panic!("Expected Identifier for hex number"),
     }
 }
 
@@ -118,11 +118,20 @@ fn test_lexer_array_hex_values() {
     let mut lexer = Lexer::new(input, PathBuf::from("test"));
 
     assert!(matches!(lexer.next_token().unwrap(), Token::LBracket));
-    assert!(matches!(lexer.next_token().unwrap(), Token::Number(16))); // 0x10
+    match lexer.next_token().unwrap() {
+        Token::Identifier(s) => assert_eq!(s, "0x10"),
+        _ => panic!("Expected Identifier"),
+    }
     assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
-    assert!(matches!(lexer.next_token().unwrap(), Token::Number(32))); // 0x20
+    match lexer.next_token().unwrap() {
+        Token::Identifier(s) => assert_eq!(s, "0x20"),
+        _ => panic!("Expected Identifier"),
+    }
     assert!(matches!(lexer.next_token().unwrap(), Token::Comma));
-    assert!(matches!(lexer.next_token().unwrap(), Token::Number(48))); // 0x30
+    match lexer.next_token().unwrap() {
+        Token::Identifier(s) => assert_eq!(s, "0x30"),
+        _ => panic!("Expected Identifier"),
+    }
     assert!(matches!(lexer.next_token().unwrap(), Token::RBracket));
 }
 

@@ -260,6 +260,32 @@ impl Lexer {
         result.parse().unwrap_or(0)
     }
 
+    fn read_hex_as_string(&mut self) -> String {
+        let mut result = String::new();
+        
+        // Read "0x" or "0X"
+        if self.current_char() == Some('0') {
+            result.push('0');
+            self.advance();
+        }
+        if matches!(self.current_char(), Some('x') | Some('X')) {
+            result.push(self.current_char().unwrap());
+            self.advance();
+        }
+        
+        // Read hex digits
+        while let Some(ch) = self.current_char() {
+            if ch.is_ascii_hexdigit() {
+                result.push(ch);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        
+        result
+    }
+
     pub fn next_token(&mut self) -> Result<Token> {
         loop {
             self.skip_whitespace();
@@ -287,6 +313,12 @@ impl Lexer {
         }
 
         if ch.is_ascii_digit() {
+            // Check if it's a hex number (0x prefix)
+            if ch == '0' && matches!(self.peek_char(1), Some('x') | Some('X')) {
+                // Read as identifier to preserve hex format
+                let hex_str = self.read_hex_as_string();
+                return Ok(Token::Identifier(hex_str));
+            }
             return Ok(Token::Number(self.read_number()));
         }
 
