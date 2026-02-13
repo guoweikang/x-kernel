@@ -321,6 +321,13 @@ impl Parser {
                         properties.prompt = Some(prompt);
                     }
                 }
+                Token::RangeType => {
+                    self.advance()?;
+                    symbol_type = SymbolType::Range;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
                 Token::Prompt => {
                     self.advance()?;
                     properties.prompt = Some(self.parse_string()?);

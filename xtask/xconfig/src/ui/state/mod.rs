@@ -47,6 +47,7 @@ pub enum ConfigValue {
     String(String),
     Int(i64),
     Hex(String),
+    Range(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -348,6 +348,59 @@ fn generate_config_rs(
 
         content.push_str(&format!("#[allow(dead_code)]\n"));
 
+        // Check if it's a range value (starts with [ and ends with ])
+        if value.starts_with('[') && value.ends_with(']') {
+            let inner = &value[1..value.len()-1];
+            
+            if inner.is_empty() {
+                // Empty array
+                content.push_str(&format!("pub const {}: &[&str] = &[];\n\n", key));
+                continue;
+            }
+            
+            let items: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+            
+            // Determine element type from first item
+            let first_item = items.first().unwrap_or(&"");
+            
+            if first_item.starts_with("0x") || first_item.starts_with("0X") {
+                // Hex array
+                let valid_items: Vec<String> = items.iter()
+                    .filter_map(|s| {
+                        let trimmed = s.trim();
+                        if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                            Some(format!("\"{}\"", trimmed))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                content.push_str(&format!("pub const {}: &[&str] = &[{}];\n\n", 
+                    key, valid_items.join(", ")));
+            } else if first_item.parse::<i64>().is_ok() {
+                // Integer array
+                let valid_items: Vec<String> = items.iter()
+                    .filter_map(|s| {
+                        if s.trim().parse::<i64>().is_ok() {
+                            Some(s.trim().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                content.push_str(&format!("pub const {}: &[i64] = &[{}];\n\n", 
+                    key, valid_items.join(", ")));
+            } else {
+                // String array
+                let str_items: Vec<String> = items.iter()
+                    .map(|s| format!("\"{}\"", s.trim().trim_matches('"')))
+                    .collect();
+                content.push_str(&format!("pub const {}: &[&str] = &[{}];\n\n", 
+                    key, str_items.join(", ")));
+            }
+            continue;
+        }
+
         // Check if it's a hex value (starts with 0x or 0X)
         if value.starts_with("0x") || value.starts_with("0X") {
             // Parse and validate as u64 hex

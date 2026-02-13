@@ -50,6 +50,10 @@ impl ConfigWriter {
                                 // String: Keep quotes
                                 writeln!(file, "{}=\"{}\"", clean_name, value)?;
                             }
+                            SymbolType::Range => {
+                                // Range: [a,b,c] format without extra quotes
+                                writeln!(file, "{}={}", clean_name, value)?;
+                            }
                             _ => {
                                 // Fallback for other types
                                 writeln!(file, "{}=\"{}\"", clean_name, value)?;
