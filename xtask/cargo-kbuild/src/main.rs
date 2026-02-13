@@ -409,13 +409,8 @@ fn infer_tuple_types(elements: &[String]) -> Vec<String> {
             return "&str".to_string();
         }
         
-        // Hexadecimal
+        // Hexadecimal - all hex values are usize
         if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-            // Try to parse to determine if we need a larger type
-            if let Ok(val) = u64::from_str_radix(&trimmed[2..].replace('_', ""), 16)
-                && val > u32::MAX as u64 {
-                    return "usize".to_string();
-                }
             return "usize".to_string();
         }
         
@@ -435,7 +430,15 @@ fn infer_tuple_types(elements: &[String]) -> Vec<String> {
 }
 
 /// Format tuple elements as Rust code
-fn format_tuple_elements(elements: &[String], types: &[String]) -> String {
+fn format_tuple_elements(elements: &[String], types: &[String]) -> Result<String, String> {
+    if elements.len() != types.len() {
+        return Err(format!(
+            "Element and type count mismatch: {} elements, {} types",
+            elements.len(),
+            types.len()
+        ));
+    }
+    
     let formatted: Vec<String> = elements.iter().zip(types.iter()).map(|(elem, typ)| {
         let trimmed = elem.trim();
         
@@ -452,7 +455,7 @@ fn format_tuple_elements(elements: &[String], types: &[String]) -> String {
         }
     }).collect();
     
-    format!("({})", formatted.join(", "))
+    Ok(format!("({})", formatted.join(", ")))
 }
 
 /// Parse tuple array and return (tuple_type, rust_code)
@@ -464,18 +467,43 @@ fn parse_tuple_array(inner: &str) -> Result<(String, String), String> {
         return Err("No tuples found".to_string());
     }
     
-    // 2. Parse first tuple to determine types
+    // 2. Parse first tuple to determine expected structure
     let first_tuple = parse_single_tuple(tuples[0])?;
+    let expected_arity = first_tuple.len();
     let types = infer_tuple_types(&first_tuple);
     
-    // 3. Generate Rust type string
+    // 3. Validate all tuples have the same arity and consistent types
+    for (idx, tuple_str) in tuples.iter().enumerate() {
+        let elements = parse_single_tuple(tuple_str)?;
+        
+        // Check arity matches
+        if elements.len() != expected_arity {
+            return Err(format!(
+                "Tuple {} has {} elements, but expected {} (from first tuple)",
+                idx, elements.len(), expected_arity
+            ));
+        }
+        
+        // Check types are consistent
+        let tuple_types = infer_tuple_types(&elements);
+        for (elem_idx, (expected_type, actual_type)) in types.iter().zip(tuple_types.iter()).enumerate() {
+            if expected_type != actual_type {
+                return Err(format!(
+                    "Type mismatch in tuple {} at position {}: expected {}, got {}",
+                    idx, elem_idx, expected_type, actual_type
+                ));
+            }
+        }
+    }
+    
+    // 4. Generate Rust type string
     let tuple_type = format!("({})", types.join(", "));
     
-    // 4. Generate all tuples' Rust code
+    // 5. Generate all tuples' Rust code
     let mut rust_lines = Vec::new();
     for tuple_str in tuples {
         let elements = parse_single_tuple(tuple_str)?;
-        let formatted = format_tuple_elements(&elements, &types);
+        let formatted = format_tuple_elements(&elements, &types)?;
         rust_lines.push(format!("    {}", formatted));
     }
     
