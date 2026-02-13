@@ -1788,15 +1788,15 @@ impl MenuConfigApp {
             return Some(trimmed.to_string());
         }
         
-        // Basic validation - just check for valid array format
-        // The actual parsing will be done by the kconfig parser
-        let inner = &trimmed[1..trimmed.len()-1];
+        // Use safer stripping approach
+        let inner = trimmed.strip_prefix('[')
+            .and_then(|s| s.strip_suffix(']'))?;
         
         // Split by comma and check each element
         let items: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
         
         // Must have at least one non-empty item
-        if items.is_empty() || items.iter().all(|s| s.is_empty()) {
+        if items.iter().all(|s| s.is_empty()) {
             return None;
         }
         
