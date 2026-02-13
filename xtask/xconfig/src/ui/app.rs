@@ -209,6 +209,21 @@ impl MenuConfigApp {
         }
     }
 
+
+    /// Get the current visible items list (with filtering applied)
+    /// This ensures consistent behavior across all navigation methods
+    fn get_visible_items(&self) -> Vec<MenuItem> {
+        let items = if self.search_active && !self.search_query.is_empty() {
+            let searcher = FuzzySearcher::new(self.search_query.clone());
+            let results = searcher.search(&self.config_state.all_items);
+            results.into_iter().map(|r| r.item).collect::<Vec<_>>()
+        } else {
+            self.config_state.get_items_for_path(&self.navigation.current_path)
+        };
+        self.filter_visible_items(items)
+    }
+
+
     /// Filter menu items based on visibility rules:
     /// 1. Items without prompts are hidden (internal variables)
     /// 2. Items with unsatisfied depends_on conditions are hidden
@@ -377,18 +392,7 @@ impl MenuConfigApp {
     }
 
     fn render_menu_tree(&mut self, frame: &mut Frame, area: Rect) {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect()
-        } else {
-            self.config_state
-                .get_items_for_path(&self.navigation.current_path)
-        };
-
-        // Apply visibility filtering
-        let visible_items = self.filter_visible_items(items);
-
+        let visible_items = self.get_visible_items();
         if visible_items.is_empty() {
             let empty = Paragraph::new("No items found").block(
                 Block::default()
@@ -486,17 +490,7 @@ impl MenuConfigApp {
     }
 
     fn render_detail_panel(&self, frame: &mut Frame, area: Rect) {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect()
-        } else {
-            self.config_state
-                .get_items_for_path(&self.navigation.current_path)
-        };
-
-        // Apply visibility filtering
-        let visible_items = self.filter_visible_items(items);
+        let visible_items = self.get_visible_items();
 
         if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
             let empty = Paragraph::new("No item selected").block(
@@ -1031,44 +1025,17 @@ impl MenuConfigApp {
     }
 
     fn move_down(&mut self) {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect::<Vec<_>>()
-        } else {
-            self.config_state
-                .get_items_for_path(&self.navigation.current_path)
-        };
+        let visible_items = self.get_visible_items();
 
-        if !items.is_empty() && self.navigation.selected_index < items.len() - 1 {
+        if !visible_items.is_empty() && self.navigation.selected_index < visible_items.len() - 1 {
             self.navigation.selected_index += 1;
         }
     }
 
     fn enter_submenu(&mut self) {
-        debug_log!(
-            "🚪 [START] enter_submenu called, current_path={:?}",
-            self.navigation.current_path
-        );
-        let items = self
-            .config_state
-            .get_items_for_path(&self.navigation.current_path);
-        debug_log!("    [1] get_items_for_path returned {} items", items.len());
-
-        // ✅ 应用可见性过滤
-        let visible_items = self.filter_visible_items(items);
-        debug_log!(
-            "    [2] After filtering: {} visible items",
-            visible_items.len()
-        );
+        let visible_items = self.get_visible_items();
 
         if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
-            debug_log!(
-                "    ❌ [EARLY EXIT] visible_items.is_empty()={}, selected_index={}, visible_items.len()={}",
-                visible_items.is_empty(),
-                self.navigation.selected_index,
-                visible_items.len()
-            );
             return;
         }
 
@@ -1123,21 +1090,18 @@ impl MenuConfigApp {
     }
 
     fn page_up(&mut self) {
-        self.navigation.selected_index = self.navigation.selected_index.saturating_sub(10);
+        let visible_items = self.get_visible_items();
+        if !visible_items.is_empty() {
+            self.navigation.selected_index = self.navigation.selected_index.saturating_sub(10);
+            // Ensure we don't go beyond the list
+            if self.navigation.selected_index >= visible_items.len() {
+                self.navigation.selected_index = visible_items.len().saturating_sub(1);
+            }
+        }
     }
 
     fn page_down(&mut self) {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect::<Vec<_>>()
-        } else {
-            self.config_state
-                .get_items_for_path(&self.navigation.current_path)
-        };
-
-        // Apply visibility filtering
-        let visible_items = self.filter_visible_items(items);
+        let visible_items = self.get_visible_items();
 
         if !visible_items.is_empty() {
             self.navigation.selected_index =
@@ -1168,17 +1132,7 @@ impl MenuConfigApp {
     }
 
     fn toggle_current_item(&mut self) -> Result<()> {
-        let items = if self.search_active && !self.search_query.is_empty() {
-            let searcher = FuzzySearcher::new(self.search_query.clone());
-            let results = searcher.search(&self.config_state.all_items);
-            results.into_iter().map(|r| r.item).collect::<Vec<_>>()
-        } else {
-            self.config_state
-                .get_items_for_path(&self.navigation.current_path)
-        };
-
-        // Apply visibility filtering
-        let visible_items = self.filter_visible_items(items);
+        let visible_items = self.get_visible_items();
 
         if visible_items.is_empty() || self.navigation.selected_index >= visible_items.len() {
             return Ok(());
