@@ -412,11 +412,10 @@ fn infer_tuple_types(elements: &[String]) -> Vec<String> {
         // Hexadecimal
         if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
             // Try to parse to determine if we need a larger type
-            if let Ok(val) = u64::from_str_radix(&trimmed[2..].replace('_', ""), 16) {
-                if val > u32::MAX as u64 {
+            if let Ok(val) = u64::from_str_radix(&trimmed[2..].replace('_', ""), 16)
+                && val > u32::MAX as u64 {
                     return "usize".to_string();
                 }
-            }
             return "usize".to_string();
         }
         
