@@ -57,6 +57,11 @@ pub enum DialogType {
         current_value: String,
         prompt: String,
     },
+    EditRange {
+        symbol: String,
+        current_value: String,
+        prompt: String,
+    },
 }
 
 pub struct MenuConfigApp {
@@ -345,6 +350,15 @@ impl MenuConfigApp {
                         symbol,
                         "Hexadecimal",
                         "Enter hex value (e.g., 0xFF, 0x1A2B)",
+                    );
+                }
+                DialogType::EditRange { symbol, prompt, .. } => {
+                    self.render_input_dialog(
+                        frame,
+                        prompt,
+                        symbol,
+                        "Range Array",
+                        "Enter array values: [item1, item2, ...] (e.g., [0x0, 0x1] or [foo, bar])",
                     );
                 }
             }
@@ -729,7 +743,8 @@ impl MenuConfigApp {
                 }
                 Some(DialogType::EditString { .. })
                 | Some(DialogType::EditInt { .. })
-                | Some(DialogType::EditHex { .. }) => self.handle_input_dialog_key(key),
+                | Some(DialogType::EditHex { .. })
+                | Some(DialogType::EditRange { .. }) => self.handle_input_dialog_key(key),
                 None => Ok(EventResult::Continue),
             };
         }
@@ -1198,6 +1213,21 @@ impl MenuConfigApp {
                         _ => "0x0".to_string(),
                     };
                     self.dialog_type = Some(DialogType::EditHex {
+                        symbol: item.id.clone(),
+                        current_value: current.clone(),
+                        prompt: item.label.clone(),
+                    });
+                    self.input_buffer = current;
+                    self.input_cursor = self.input_buffer.len();
+                    self.focus = PanelFocus::Dialog;
+                    return Ok(());
+                }
+                SymbolType::Range => {
+                    let current = match &item.value {
+                        Some(ConfigValue::Range(r)) => r.clone(),
+                        _ => "[]".to_string(),
+                    };
+                    self.dialog_type = Some(DialogType::EditRange {
                         symbol: item.id.clone(),
                         current_value: current.clone(),
                         prompt: item.label.clone(),
@@ -1745,6 +1775,41 @@ impl MenuConfigApp {
         Some(format!("0x{}", hex_part.to_lowercase()))
     }
 
+    fn validate_range(input: &str) -> Option<String> {
+        let trimmed = input.trim();
+        
+        // Must start with [ and end with ]
+        if !trimmed.starts_with('[') || !trimmed.ends_with(']') {
+            return None;
+        }
+        
+        // Empty array is valid
+        if trimmed == "[]" {
+            return Some(trimmed.to_string());
+        }
+        
+        // Use safer stripping approach
+        let inner = trimmed.strip_prefix('[')
+            .and_then(|s| s.strip_suffix(']'))?;
+        
+        // Split by comma and check each element
+        let items: Vec<&str> = inner.split(',').map(|s| s.trim()).collect();
+        
+        // Must have at least one non-empty item
+        if items.iter().all(|s| s.is_empty()) {
+            return None;
+        }
+        
+        // Reconstruct with consistent spacing
+        let normalized_items: Vec<String> = items
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
+        
+        Some(format!("[{}]", normalized_items.join(", ")))
+    }
+
     fn save_input_dialog(&mut self) -> Result<()> {
         if let Some(dialog_type) = &self.dialog_type.clone() {
             match dialog_type {
@@ -1773,6 +1838,16 @@ impl MenuConfigApp {
                         self.status_message = Some(format!("✓ {} = {}", symbol, value));
                     } else {
                         self.status_message = Some("✗ Invalid hex (use 0xABC format)".to_string());
+                        return Ok(());
+                    }
+                }
+                DialogType::EditRange { symbol, .. } => {
+                    if let Some(value) = Self::validate_range(&self.input_buffer) {
+                        self.update_config_value(symbol, ConfigValue::Range(value.clone()))?;
+                        self.symbol_table.set_value_tracked(symbol, value.clone());
+                        self.status_message = Some(format!("✓ {} = {}", symbol, value));
+                    } else {
+                        self.status_message = Some("✗ Invalid range (use [item1, item2, ...] format)".to_string());
                         return Ok(());
                     }
                 }

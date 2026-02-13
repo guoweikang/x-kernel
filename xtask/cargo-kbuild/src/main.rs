@@ -580,13 +580,23 @@ fn generate_config_rs(
             let first_item = items[0];
             
             if first_item.starts_with("0x") || first_item.starts_with("0X") {
-                // Hex array - validate all items are hex
+                // Hex array - parse as usize values
                 let mut valid_items: Vec<String> = Vec::new();
                 let mut has_invalid = false;
                 for s in &items {
                     let trimmed = s.trim();
                     if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
-                        valid_items.push(format!("\"{}\"", trimmed));
+                        // Parse hex string to validate and keep original format
+                        match usize::from_str_radix(&trimmed[2..], 16) {
+                            Ok(_) => {
+                                // Keep the hex format (0x...)
+                                valid_items.push(trimmed.to_string());
+                            }
+                            Err(_) => {
+                                eprintln!("⚠️  Warning: Invalid hex value '{}' in array {}", trimmed, key);
+                                has_invalid = true;
+                            }
+                        }
                     } else {
                         eprintln!("⚠️  Warning: Skipping non-hex item '{}' in hex array {}", trimmed, key);
                         has_invalid = true;
@@ -595,7 +605,7 @@ fn generate_config_rs(
                 if has_invalid {
                     eprintln!("⚠️  Warning: {} has mixed types - only hex values will be included", key);
                 }
-                content.push_str(&format!("pub const {}: &[&str] = &[{}];\n\n", 
+                content.push_str(&format!("pub const {}: &[usize] = &[{}];\n\n", 
                     key, valid_items.join(", ")));
             } else if first_item.parse::<i64>().is_ok() {
                 // Integer array - validate all items are integers
