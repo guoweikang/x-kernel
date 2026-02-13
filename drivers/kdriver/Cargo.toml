@@ -62,6 +62,7 @@ smallvec = { version = "1.15", features = ["const_generics", "union"] }
 
 ksync = { workspace = true, optional = true }
 hashbrown = { workspace = true, optional = true }
+kbuild_config = { workspace = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 arm-gic-driver = { version = "0.15", optional = true }

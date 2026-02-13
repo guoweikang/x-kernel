@@ -152,11 +152,6 @@ config KERNEL_BASE_VADDR
     help
       Specify the base virtual address where the kernel is mapped.
 
-config PHYS_BUS_OFFSET
-    hex "Physical Bus Offset"
-    default 0x0
-    help
-      Specify the physical bus offset for device memory mapping.
 
 config TASK_STACK_SIZE
     hex "Task Stack Size (bytes)"
