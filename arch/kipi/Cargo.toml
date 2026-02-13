@@ -12,7 +12,6 @@ repository.workspace = true
 default = []
 
 [dependencies]
-platconfig.workspace = true
 khal = { workspace = true, features = ["ipi"] }
 kspin.workspace = true
 lazyinit.workspace = true

@@ -49,8 +49,8 @@ fn mem_to_mapping_flags(f: MemFlags) -> MappingFlags {
 /// Creates a new address space for kernel itself.
 pub fn new_kernel_layout() -> LinuxResult<AddrSpace> {
     let mut vmspace = AddrSpace::new_empty(
-        va!(platconfig::plat::KERNEL_ASPACE_BASE),
-        platconfig::plat::KERNEL_ASPACE_SIZE,
+        va!(kbuild_config::KERNEL_ASPACE_BASE as _),
+        kbuild_config::KERNEL_ASPACE_SIZE as _,
     )?;
     for region in memory_regions() {
         // mapped range should contain the whole region if it is not aligned.

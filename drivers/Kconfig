@@ -1,0 +1,33 @@
+menu "Drivers Basic Configuration"
+
+config RTC
+    bool "RTC Support"
+    default y
+    help
+      Enable support for Real Time Clock (RTC) devices.
+
+config PHYS_BUS_OFFSET
+    hex "Physical Bus Offset"
+    default 0x0
+    help
+      Specify the physical bus offset for device memory mapping.
+
+config PCI_ECAM_BASE
+    hex "PCI ECAM Base Address"
+    default 0x40100000000
+    help
+      Define the base address for PCI Express Configuration Access Mechanism (ECAM).
+
+config PCI_BUS_END
+    hex "PCI Bus End"
+    default 0xff
+    help
+      Set the end bus number for PCI devices.
+
+config PCI_RANGES
+    rangetype "PCI Address Ranges"
+    default [0x0, 0x1]
+    help
+      Specify the address ranges for PCI devices.
+endmenu
+

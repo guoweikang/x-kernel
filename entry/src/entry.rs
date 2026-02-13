@@ -28,6 +28,7 @@ pub fn run_initproc(args: &[String], envs: &[String]) -> i32 {
         })
         .expect("Failed to create user address space");
 
+    warn!("Starting init process: {:?}", args);
     let loc = FS_CONTEXT
         .lock()
         .resolve(&args[0])

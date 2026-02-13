@@ -27,6 +27,10 @@ extern crate log;
 
 extern crate alloc;
 
+
+const CPU_NUM: usize = kbuild_config::CPU_NUM as usize;
+const TASK_STACK_SIZE: usize = kbuild_config::TASK_STACK_SIZE as usize;
+
 #[macro_use]
 mod run_queue;
 mod api;
