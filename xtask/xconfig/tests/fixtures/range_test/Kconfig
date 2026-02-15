@@ -1,0 +1,31 @@
+mainmenu "Range Type Test"
+
+config TEST_RANGE_NUMBERS
+    rangetype "Test numeric range"
+    default [1,2,3,4,5]
+    help
+      Test range with numbers
+
+config TEST_RANGE_STRINGS
+    rangetype "Test string range"
+    default [apple,banana,cherry]
+    help
+      Test range with strings
+
+config TEST_RANGE_HEX
+    rangetype "Test hex range"
+    default [0x10,0x20,0x30]
+    help
+      Test range with hex values
+
+config TEST_RANGE_EMPTY
+    rangetype "Test empty range"
+    default []
+    help
+      Test empty range
+
+config TEST_NORMAL_INT
+    int "Normal integer config"
+    default 42
+    help
+      A normal integer config to verify no regressions
