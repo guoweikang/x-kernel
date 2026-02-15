@@ -156,7 +156,13 @@ oldconfig:
 	fi
 	@xconf oldconfig -c .config -k Kconfig -s .
 
-build: $(OUT_DIR) $(FINAL_IMG)
+# Generate const definitions before build
+gen-const:
+	@echo "📝 Generating Rust const definitions from .config..."
+	@cargo run -p xconfig --bin xconf -- gen-const
+	@echo "✅ Generated config.rs"
+
+build: gen-const $(OUT_DIR) $(FINAL_IMG)
 
 disasm:
 	$(OBJDUMP) $(OUT_ELF) | less
@@ -215,7 +221,7 @@ distclean: clean
 clean_c::
 	rm -rf $(app-objs)
 
-.PHONY: all defconfig oldconfig menuconfig saveconfig \
+.PHONY: all defconfig oldconfig menuconfig saveconfig gen-const \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
 	disk_img clean distclean clean_c
