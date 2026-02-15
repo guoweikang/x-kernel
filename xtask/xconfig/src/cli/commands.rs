@@ -98,6 +98,17 @@ pub enum Commands {
         #[arg(short, long, default_value = ".")]
         srctree: PathBuf,
     },
+
+    /// Generate Rust const definitions from .config
+    GenConst {
+        /// Path to .config file
+        #[arg(short, long, default_value = ".config")]
+        config: PathBuf,
+        
+        /// Output directory for generated config.rs
+        #[arg(short, long, default_value = "target/kbuild")]
+        output_dir: PathBuf,
+    },
 }
 
 pub fn parse_command(kconfig: PathBuf, srctree: PathBuf) -> Result<()> {
@@ -176,5 +187,9 @@ pub fn run_cli() -> Result<()> {
             kconfig,
             srctree,
         } => crate::cli::saveconfig::saveconfig_command(output, kconfig, srctree),
+        Commands::GenConst {
+            config,
+            output_dir,
+        } => crate::cli::gen_const::gen_const_command(config, output_dir),
     }
 }
