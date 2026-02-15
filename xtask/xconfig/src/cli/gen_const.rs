@@ -339,7 +339,7 @@ fn generate_config_rs(
                 content.push_str(&format!("pub const {}: &[usize] = &[{}];\n\n", 
                     key, valid_items.join(", ")));
             } else if first_item.parse::<usize>().is_ok() {
-                // Integer array - validate all items are integers, changed to usize
+                // Integer array - validate all items are unsigned integers
                 let mut valid_items: Vec<String> = Vec::new();
                 let mut has_invalid = false;
                 for s in &items {
@@ -368,7 +368,7 @@ fn generate_config_rs(
 
         // Check if it's a hex value (starts with 0x or 0X)
         if value.starts_with("0x") || value.starts_with("0X") {
-            // Parse and validate as usize hex (changed from u64)
+            // Parse and validate as usize hex
             match usize::from_str_radix(&value[2..], 16) {
                 Ok(_) => {
                     content.push_str(&format!("pub const {}: usize = {};\n\n", key, value));
@@ -378,7 +378,7 @@ fn generate_config_rs(
                 }
             }
         }
-        // Try parsing as unsigned integer first (changed to usize)
+        // Try parsing as unsigned integer
         else if let Ok(uint_val) = value.parse::<usize>() {
             content.push_str(&format!("pub const {}: usize = {};\n\n", key, uint_val));
         }
