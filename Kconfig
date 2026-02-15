@@ -140,6 +140,18 @@ endmenu # Platform Selection
 
 menu "Kernel Features"
 
+config PHYS_MEM_BASE
+    hex "Physical Memory Base Address"
+    default 0x40000000
+    help
+      Specify the base physical address of the system memory.
+
+config PHYS_MEM_SIZE
+    hex "Physical Memory Size"
+    default 0x40000000
+    help
+      Specify the size of the physical memory.
+
 config KERNEL_BASE_PADDR
     hex "Kernel Base Physical Address"
     default 0x80000000
@@ -164,11 +176,23 @@ config KERNEL_ASPACE_SIZE
     help
       Specify the size of the kernel's address space.
 
+config PHYS_VIRT_OFFSET
+    hex "Physical to Virtual Address Offset"
+    default 0xFFFF000000000000
+    help
+      Specify the offset used to convert physical addresses to virtual addresses.
+
 config TASK_STACK_SIZE
     hex "Task Stack Size (bytes)"
-    default 0x4000
+    default 0x40000
     help
       Specify the stack size for each task in bytes.
+
+config BOOT_STACK_SIZE
+    hex "Boot Stack Size (bytes)"
+    default 0x40000
+    help
+      Specify the stack size for the boot process in bytes.
 
 config CPU_NUM
     int "Number of CPUs"
@@ -181,6 +205,12 @@ config TICKS_PER_SECOND
     default 100
     help
       Specify the number of timer ticks per second.
+
+config SEV_CBIT_POS
+    int "SEV CBIT Position"
+    default 47
+    help
+      Specify the bit position of the SEV CBIT in the page table entries.
 
 endmenu
 
