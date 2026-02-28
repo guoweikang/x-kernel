@@ -1,7 +1,7 @@
 use crate::config::ConfigReader;
 use crate::error::Result;
 use crate::kconfig::Parser;
-use crate::ui::MenuConfigApp;
+use crate::ui::{MenuConfigApp, dependency_resolver::DependencyResolver};
 use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
@@ -73,6 +73,34 @@ pub fn menuconfig_command(kconfig: PathBuf, srctree: PathBuf) -> Result<()> {
         // Re-evaluate conditional defaults (Fix Bug 1).
         // Derived symbols (no prompt) are ALWAYS recalculated (Linux Kconfig semantics).
         reevaluate_defaults(&ast.entries, &mut symbol_table);
+
+        // Filter ghost configs: clear symbols whose dependencies are not satisfied.
+        // This handles cases like PMU_IRQ=23 in x86_64 defconfig where PMU_IRQ depends on ARCH_AARCH64.
+        let mut dep_resolver = DependencyResolver::new();
+        dep_resolver.build_from_entries(&ast.entries);
+
+        let ghost_names: Vec<String> = symbol_table
+            .all_symbols()
+            .filter(|(name, sym)| {
+                // A symbol is a "ghost" if it has a value but dependencies are not met
+                sym.value.is_some() && dep_resolver.can_enable(name, &symbol_table).is_err()
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        if !ghost_names.is_empty() {
+            println!(
+                "🧹 Clearing {} ghost configuration(s) with unsatisfied dependencies:",
+                ghost_names.len()
+            );
+            for name in &ghost_names {
+                println!("  - {}", name);
+            }
+        }
+
+        for name in ghost_names {
+            symbol_table.clear_value(&name);
+        }
     } else {
         println!("No existing .config found, using defaults");
     }
