@@ -118,11 +118,11 @@ fn test_menu_content_alignment() {
         "Drivers Basic Configuration menu should have items"
     );
 
-    // Check that Drivers Basic Configuration contains RTC
-    let has_rtc = drivers_items.iter().any(|item| item.id == "RTC");
+    // Check that Drivers Basic Configuration contains RTC_PADDR
+    let has_rtc = drivers_items.iter().any(|item| item.id == "RTC_PADDR");
     assert!(
         has_rtc,
-        "Drivers Basic Configuration should contain RTC config, but got: {:?}",
+        "Drivers Basic Configuration should contain RTC_PADDR config, but got: {:?}",
         drivers_items.iter().map(|i| &i.id).collect::<Vec<_>>()
     );
 
@@ -136,8 +136,8 @@ fn test_menu_content_alignment() {
         "Platform Selection should NOT contain Kernel Features content"
     );
 
-    // Kernel Features should NOT have RTC
-    let kernel_has_rtc = kernel_items.iter().any(|item| item.id == "RTC");
+    // Kernel Features should NOT have RTC_PADDR
+    let kernel_has_rtc = kernel_items.iter().any(|item| item.id == "RTC_PADDR");
     assert!(
         !kernel_has_rtc,
         "Kernel Features should NOT contain Drivers content"
