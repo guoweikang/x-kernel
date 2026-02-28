@@ -1214,18 +1214,7 @@ impl MenuConfigApp {
                     self.focus = PanelFocus::Dialog;
                     return Ok(());
                 }
-                SymbolType::U8
-                | SymbolType::U16
-                | SymbolType::U32
-                | SymbolType::U64
-                | SymbolType::U128
-                | SymbolType::Usize
-                | SymbolType::I8
-                | SymbolType::I16
-                | SymbolType::I32
-                | SymbolType::I64
-                | SymbolType::I128
-                | SymbolType::Isize => {
+                ty if ty.is_integer_type() => {
                     let current = match &item.value {
                         Some(ConfigValue::Int(i)) => *i,
                         _ => 0,

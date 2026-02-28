@@ -59,6 +59,28 @@ pub enum RustType {
     String,
 }
 
+impl SymbolType {
+    /// Returns `true` if this is one of the explicit Rust integer types
+    /// (`u8`…`usize`, `i8`…`isize`).
+    pub fn is_integer_type(&self) -> bool {
+        matches!(
+            self,
+            SymbolType::U8
+                | SymbolType::U16
+                | SymbolType::U32
+                | SymbolType::U64
+                | SymbolType::U128
+                | SymbolType::Usize
+                | SymbolType::I8
+                | SymbolType::I16
+                | SymbolType::I32
+                | SymbolType::I64
+                | SymbolType::I128
+                | SymbolType::Isize
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Symbol(String),

@@ -46,18 +46,7 @@ impl ConfigWriter {
                                     };
                                 writeln!(file, "{}={}", clean_name, normalized_hex)?;
                             }
-                            SymbolType::U8
-                            | SymbolType::U16
-                            | SymbolType::U32
-                            | SymbolType::U64
-                            | SymbolType::U128
-                            | SymbolType::Usize
-                            | SymbolType::I8
-                            | SymbolType::I16
-                            | SymbolType::I32
-                            | SymbolType::I64
-                            | SymbolType::I128
-                            | SymbolType::Isize => {
+                            ref ty if ty.is_integer_type() => {
                                 // Integer: NO quotes, decimal format
                                 writeln!(file, "{}={}", clean_name, value)?;
                             }

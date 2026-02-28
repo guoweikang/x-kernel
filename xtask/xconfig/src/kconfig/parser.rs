@@ -5,6 +5,27 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Map an integer-type token to the corresponding [`SymbolType`] variant.
+///
+/// Panics if `token` is not one of the integer type tokens.
+fn token_to_integer_symbol_type(token: &Token) -> SymbolType {
+    match token {
+        Token::U8 => SymbolType::U8,
+        Token::U16 => SymbolType::U16,
+        Token::U32 => SymbolType::U32,
+        Token::U64 => SymbolType::U64,
+        Token::U128 => SymbolType::U128,
+        Token::Usize => SymbolType::Usize,
+        Token::I8 => SymbolType::I8,
+        Token::I16 => SymbolType::I16,
+        Token::I32 => SymbolType::I32,
+        Token::I64 => SymbolType::I64,
+        Token::I128 => SymbolType::I128,
+        Token::Isize => SymbolType::Isize,
+        _ => panic!("token_to_integer_symbol_type called with non-integer token: {:?}", token),
+    }
+}
+
 pub struct Parser {
     current_file: PathBuf,
     srctree: PathBuf,
@@ -307,86 +328,21 @@ impl Parser {
                         properties.prompt = Some(prompt);
                     }
                 }
-                Token::U8 => {
+                Token::U8
+                | Token::U16
+                | Token::U32
+                | Token::U64
+                | Token::U128
+                | Token::Usize
+                | Token::I8
+                | Token::I16
+                | Token::I32
+                | Token::I64
+                | Token::I128
+                | Token::Isize => {
+                    let tok = self.current_context().current_token.clone();
                     self.advance()?;
-                    symbol_type = SymbolType::U8;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::U16 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::U16;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::U32 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::U32;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::U64 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::U64;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::U128 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::U128;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::Usize => {
-                    self.advance()?;
-                    symbol_type = SymbolType::Usize;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::I8 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::I8;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::I16 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::I16;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::I32 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::I32;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::I64 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::I64;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::I128 => {
-                    self.advance()?;
-                    symbol_type = SymbolType::I128;
-                    if let Ok(prompt) = self.try_parse_prompt() {
-                        properties.prompt = Some(prompt);
-                    }
-                }
-                Token::Isize => {
-                    self.advance()?;
-                    symbol_type = SymbolType::Isize;
+                    symbol_type = token_to_integer_symbol_type(&tok);
                     if let Ok(prompt) = self.try_parse_prompt() {
                         properties.prompt = Some(prompt);
                     }
