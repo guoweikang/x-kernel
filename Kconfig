@@ -213,6 +213,13 @@ config SEV_CBIT_POS
     help
       Specify the bit position of the SEV CBIT in the page table entries.
 
+config TIMER_FREQUENCY_HZ
+    int "Timer Frequency (Hz)"
+    depends on ARCH_X86_64
+    default 4000000000
+    help
+      Specify the frequency of the timer in hertz.
+
 endmenu
 
 source "drivers/Kconfig"
