@@ -1,6 +1,7 @@
 use crate::config::{ConfigGenerator, ConfigWriter};
 use crate::error::Result;
 use crate::kconfig::Parser;
+use crate::ui::dependency_resolver::DependencyResolver;
 use std::path::PathBuf;
 
 pub fn saveconfig_command(output: PathBuf, kconfig: PathBuf, srctree: PathBuf) -> Result<()> {
@@ -17,6 +18,27 @@ pub fn saveconfig_command(output: PathBuf, kconfig: PathBuf, srctree: PathBuf) -
 
     // Extract symbols from AST and apply defaults
     extract_symbols_from_entries(&ast.entries, &mut symbols);
+
+    // Build dependency resolver so we can skip inactive symbols
+    let mut dep_resolver = DependencyResolver::new();
+    dep_resolver.build_from_entries(&ast.entries);
+
+    // Collect symbols whose dependencies are not met; clear their values so the
+    // writer treats them as "not set" (bool/tristate) or skips them (other types).
+    let inactive: Vec<String> = symbols
+        .all_symbols()
+        .filter_map(|(name, _)| {
+            if dep_resolver.can_enable(name, &symbols).is_err() {
+                Some(name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for name in &inactive {
+        symbols.clear_value(name);
+    }
 
     // Write .config file
     ConfigWriter::write(&output, &symbols)?;
