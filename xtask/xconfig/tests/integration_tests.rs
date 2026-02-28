@@ -22,7 +22,7 @@ fn test_complete_workflow() {
     symbols.set_value("TEST_BOOL", "y".to_string());
     symbols.add_symbol("TEST_STRING".to_string(), SymbolType::String);
     symbols.set_value("TEST_STRING", "hello".to_string());
-    symbols.add_symbol("TEST_INT".to_string(), SymbolType::Int);
+    symbols.add_symbol("TEST_INT".to_string(), SymbolType::U32);
     symbols.set_value("TEST_INT", "42".to_string());
 
     // 3. Write .config

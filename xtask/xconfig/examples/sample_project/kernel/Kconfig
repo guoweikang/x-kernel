@@ -5,7 +5,7 @@ config KERNEL_VERSION
 	  Enter the kernel version string.
 
 config MAX_CPUS
-	int "Maximum number of CPUs"
+	u32 "Maximum number of CPUs"
 	default 8
 	help
 	  Maximum number of CPUs supported.
@@ -17,7 +17,7 @@ config MEMORY_BASE
 	  Base address of system memory.
 
 config LOG_LEVEL_NUM
-	int "Log level (0-7)"
+	u32 "Log level (0-7)"
 	default 4
 	help
 	  Kernel log level: 0=emerg, 7=debug

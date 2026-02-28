@@ -5,9 +5,80 @@ pub enum SymbolType {
     Bool,
     Tristate,
     String,
-    Int,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
     Hex,
-    Range,
+    Range(RangeType),
+}
+
+/// Represents the element type of a rangetype config.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RangeType {
+    /// Array of string slices: `["&str"]` or `["String"]`
+    StringArray,
+    /// Array of tuples: `[(u64, u64)]` or `[(u32, u32, u32)]`
+    Tuple(Vec<RustType>),
+    /// Array of a single primitive type: `[u32]`, `[usize]`, etc.
+    Primitive(RustType),
+    /// Type not yet determined (placeholder before the default is parsed).
+    Unknown,
+}
+
+impl Default for RangeType {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
+/// Represents a Rust primitive or string type used inside rangetype annotations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RustType {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    Str,
+    String,
+}
+
+impl SymbolType {
+    /// Returns `true` if this is one of the explicit Rust integer types
+    /// (`u8`…`usize`, `i8`…`isize`).
+    pub fn is_integer_type(&self) -> bool {
+        matches!(
+            self,
+            SymbolType::U8
+                | SymbolType::U16
+                | SymbolType::U32
+                | SymbolType::U64
+                | SymbolType::U128
+                | SymbolType::Usize
+                | SymbolType::I8
+                | SymbolType::I16
+                | SymbolType::I32
+                | SymbolType::I64
+                | SymbolType::I128
+                | SymbolType::Isize
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

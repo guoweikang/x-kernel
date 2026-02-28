@@ -38,7 +38,7 @@ config PLATFORM_AARCH64_CROSVM_VIRT
 endchoice
 
 config PMU_IRQ
-    int "PMU IRQ number"
+    u32 "PMU IRQ number"
     default 23
 
 config PSCI_METHOD

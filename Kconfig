@@ -195,26 +195,26 @@ config BOOT_STACK_SIZE
       Specify the stack size for the boot process in bytes.
 
 config CPU_NUM
-    int "Number of CPUs"
+    u32 "Number of CPUs"
     default 4
     help
       Specify the number of CPUs to simulate in the kernel.
 
 config TICKS_PER_SECOND
-    int "Ticks Per Second"
+    u32 "Ticks Per Second"
     default 100
     help
       Specify the number of timer ticks per second.
 
 config SEV_CBIT_POS
-    int "SEV CBIT Position"
+    u32 "SEV CBIT Position"
     depends on ARCH_X86_64
     default 47
     help
       Specify the bit position of the SEV CBIT in the page table entries.
 
 config TIMER_FREQUENCY_HZ
-    int "Timer Frequency (Hz)"
+    u32 "Timer Frequency (Hz)"
     depends on ARCH_X86_64
     default 4000000000
     help
