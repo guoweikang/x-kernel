@@ -104,10 +104,18 @@ pub enum Commands {
         /// Path to .config file
         #[arg(short, long, default_value = ".config")]
         config: PathBuf,
-        
+
         /// Output directory for generated config.rs
         #[arg(short, long, default_value = "target/kbuild")]
         output_dir: PathBuf,
+
+        /// Path to Kconfig file (source of truth for types)
+        #[arg(short, long, default_value = "Kconfig")]
+        kconfig: PathBuf,
+
+        /// Source tree path
+        #[arg(short, long, default_value = ".")]
+        srctree: PathBuf,
     },
 }
 
@@ -190,6 +198,8 @@ pub fn run_cli() -> Result<()> {
         Commands::GenConst {
             config,
             output_dir,
-        } => crate::cli::gen_const::gen_const_command(config, output_dir),
+            kconfig,
+            srctree,
+        } => crate::cli::gen_const::gen_const_command(config, output_dir, kconfig, srctree),
     }
 }
