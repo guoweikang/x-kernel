@@ -307,9 +307,86 @@ impl Parser {
                         properties.prompt = Some(prompt);
                     }
                 }
-                Token::Int => {
+                Token::U8 => {
                     self.advance()?;
-                    symbol_type = SymbolType::Int;
+                    symbol_type = SymbolType::U8;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::U16 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::U16;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::U32 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::U32;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::U64 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::U64;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::U128 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::U128;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::Usize => {
+                    self.advance()?;
+                    symbol_type = SymbolType::Usize;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::I8 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::I8;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::I16 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::I16;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::I32 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::I32;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::I64 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::I64;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::I128 => {
+                    self.advance()?;
+                    symbol_type = SymbolType::I128;
+                    if let Ok(prompt) = self.try_parse_prompt() {
+                        properties.prompt = Some(prompt);
+                    }
+                }
+                Token::Isize => {
+                    self.advance()?;
+                    symbol_type = SymbolType::Isize;
                     if let Ok(prompt) = self.try_parse_prompt() {
                         properties.prompt = Some(prompt);
                     }
@@ -323,7 +400,7 @@ impl Parser {
                 }
                 Token::RangeType => {
                     self.advance()?;
-                    symbol_type = SymbolType::Range;
+                    symbol_type = SymbolType::Range(RangeType::Unknown);
                     if let Ok(prompt) = self.try_parse_prompt() {
                         properties.prompt = Some(prompt);
                     }
@@ -339,22 +416,30 @@ impl Parser {
                 Token::Default => {
                     self.advance()?;
                     
-                    // Check if it's an array literal
-                    let value = if matches!(self.current_context().current_token, Token::LBracket) {
-                        self.parse_array_literal()?
+                    // For rangetype configs, the default is a type annotation, not a value
+                    if matches!(symbol_type, SymbolType::Range(_))
+                        && matches!(self.current_context().current_token, Token::LBracket)
+                    {
+                        let range_type = self.parse_range_type_annotation()?;
+                        symbol_type = SymbolType::Range(range_type);
                     } else {
-                        self.parse_expr()?
-                    };
+                        // Check if it's an array literal
+                        let value = if matches!(self.current_context().current_token, Token::LBracket) {
+                            self.parse_array_literal()?
+                        } else {
+                            self.parse_expr()?
+                        };
 
-                    // Check for optional 'if' condition
-                    let condition = if matches!(self.current_context().current_token, Token::If) {
-                        self.advance()?; // consume 'if'
-                        Some(self.parse_expr()?)
-                    } else {
-                        None
-                    };
+                        // Check for optional 'if' condition
+                        let condition = if matches!(self.current_context().current_token, Token::If) {
+                            self.advance()?; // consume 'if'
+                            Some(self.parse_expr()?)
+                        } else {
+                            None
+                        };
 
-                    properties.defaults.push(DefaultValue { value, condition });
+                        properties.defaults.push(DefaultValue { value, condition });
+                    }
                 }
                 Token::Depends => {
                     self.advance()?;
@@ -780,5 +865,88 @@ impl Parser {
                 message: format!("Unexpected token in array: {:?}", token),
             }),
         }
+    }
+
+    /// Parse a rangetype type annotation, e.g. `[(u64, u64)]`, `[u32]`, `["&str"]`.
+    fn parse_range_type_annotation(&mut self) -> Result<RangeType> {
+        self.expect(Token::LBracket)?;
+
+        match self.current_context().current_token.clone() {
+            Token::RBracket => {
+                return Err(KconfigError::Syntax {
+                    file: self.current_file.clone(),
+                    line: self.current_context().lexer.current_line(),
+                    message:
+                        "Empty array type annotation: must specify element type, e.g. [(u64, u64)]"
+                            .to_string(),
+                });
+            }
+            Token::LParen => {
+                // Tuple type: [(type1, type2, ...)]
+                self.advance()?;
+                let mut types = Vec::new();
+                loop {
+                    types.push(self.parse_rust_type()?);
+                    match self.current_context().current_token.clone() {
+                        Token::Comma => {
+                            self.advance()?;
+                        }
+                        Token::RParen => break,
+                        other => {
+                            return Err(KconfigError::Syntax {
+                                file: self.current_file.clone(),
+                                line: self.current_context().lexer.current_line(),
+                                message: format!(
+                                    "Expected ',' or ')' in tuple type annotation, got {:?}",
+                                    other
+                                ),
+                            });
+                        }
+                    }
+                }
+                self.expect(Token::RParen)?;
+                self.expect(Token::RBracket)?;
+                Ok(RangeType::Tuple(types))
+            }
+            Token::StringLit(s) if s == "&str" || s == "String" => {
+                self.advance()?;
+                self.expect(Token::RBracket)?;
+                Ok(RangeType::StringArray)
+            }
+            _ => {
+                // Primitive type: [u32], [usize], etc.
+                let ty = self.parse_rust_type()?;
+                self.expect(Token::RBracket)?;
+                Ok(RangeType::Primitive(ty))
+            }
+        }
+    }
+
+    /// Parse a single Rust type token (used inside rangetype type annotations).
+    fn parse_rust_type(&mut self) -> Result<RustType> {
+        let token = self.current_context().current_token.clone();
+        let ty = match &token {
+            Token::U8 => RustType::U8,
+            Token::U16 => RustType::U16,
+            Token::U32 => RustType::U32,
+            Token::U64 => RustType::U64,
+            Token::U128 => RustType::U128,
+            Token::Usize => RustType::Usize,
+            Token::I8 => RustType::I8,
+            Token::I16 => RustType::I16,
+            Token::I32 => RustType::I32,
+            Token::I64 => RustType::I64,
+            Token::I128 => RustType::I128,
+            Token::Isize => RustType::Isize,
+            other => {
+                return Err(KconfigError::Syntax {
+                    file: self.current_file.clone(),
+                    line: self.current_context().lexer.current_line(),
+                    message: format!("Expected Rust type (u8, u32, usize, …), got {:?}", other),
+                });
+            }
+        };
+        self.advance()?;
+        Ok(ty)
     }
 }

@@ -2,30 +2,30 @@ mainmenu "Range Type Test"
 
 config TEST_RANGE_NUMBERS
     rangetype "Test numeric range"
-    default [1,2,3,4,5]
+    default [u32]
     help
       Test range with numbers
 
 config TEST_RANGE_STRINGS
     rangetype "Test string range"
-    default [apple,banana,cherry]
+    default ["&str"]
     help
       Test range with strings
 
 config TEST_RANGE_HEX
     rangetype "Test hex range"
-    default [0x10,0x20,0x30]
+    default [usize]
     help
       Test range with hex values
 
 config TEST_RANGE_EMPTY
     rangetype "Test empty range"
-    default []
+    default [(u64, u64)]
     help
-      Test empty range
+      Test empty range (type-annotated)
 
 config TEST_NORMAL_INT
-    int "Normal integer config"
+    u32 "Normal integer config"
     default 42
     help
       A normal integer config to verify no regressions

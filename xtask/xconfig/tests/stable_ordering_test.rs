@@ -2,6 +2,7 @@ use std::fs;
 use tempfile::TempDir;
 use xconfig::config::writer::ConfigWriter;
 use xconfig::kconfig::{SymbolTable, SymbolType};
+use xconfig::kconfig::ast::RangeType;
 
 #[test]
 fn test_config_stable_ordering() {
@@ -16,10 +17,10 @@ fn test_config_stable_ordering() {
     symbols.add_symbol("AAA_FIRST".to_string(), SymbolType::String);
     symbols.set_value("AAA_FIRST", "\"first\"".to_string());
     
-    symbols.add_symbol("MMM_MIDDLE".to_string(), SymbolType::Int);
+    symbols.add_symbol("MMM_MIDDLE".to_string(), SymbolType::U32);
     symbols.set_value("MMM_MIDDLE", "42".to_string());
     
-    symbols.add_symbol("BBB_SECOND".to_string(), SymbolType::Range);
+    symbols.add_symbol("BBB_SECOND".to_string(), SymbolType::Range(RangeType::Unknown));
     symbols.set_value("BBB_SECOND", "[1, 2, 3]".to_string());
     
     // Generate config twice

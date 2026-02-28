@@ -7,5 +7,5 @@ config TEST_STRING
 	default "hello"
 
 config TEST_INT
-	int "Test integer option"
+	u32 "Test integer option"
 	default 42

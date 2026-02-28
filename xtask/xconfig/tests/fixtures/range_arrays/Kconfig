@@ -2,30 +2,30 @@ mainmenu "Test Range Array Configuration"
 
 config TEST_RANGE_NUMBERS
     rangetype "Test numeric range"
-    default [1, 2, 3, 4, 5]
+    default [u32]
     help
       Test range with numbers
 
 config TEST_RANGE_HEX
     rangetype "Test hex range"
-    default [0x10, 0x20, 0x30]
+    default [usize]
     help
       Test range with hex values
 
 config TEST_RANGE_IDENTIFIERS
     rangetype "Test identifier range"
-    default [apple, banana, cherry]
+    default ["&str"]
     help
       Test range with identifiers
 
 config TEST_RANGE_EMPTY
     rangetype "Empty range"
-    default []
+    default [(u64, u64)]
     help
-      Test empty range
+      Test empty range (type-annotated)
 
 config TEST_RANGE_MIXED
     rangetype "Mixed range"
-    default [1, 0x20, value]
+    default [(u32, usize)]
     help
       Test mixed values in range

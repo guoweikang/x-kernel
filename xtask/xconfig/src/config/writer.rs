@@ -46,15 +46,26 @@ impl ConfigWriter {
                                     };
                                 writeln!(file, "{}={}", clean_name, normalized_hex)?;
                             }
-                            SymbolType::Int => {
-                                // Int: NO quotes, decimal format
+                            SymbolType::U8
+                            | SymbolType::U16
+                            | SymbolType::U32
+                            | SymbolType::U64
+                            | SymbolType::U128
+                            | SymbolType::Usize
+                            | SymbolType::I8
+                            | SymbolType::I16
+                            | SymbolType::I32
+                            | SymbolType::I64
+                            | SymbolType::I128
+                            | SymbolType::Isize => {
+                                // Integer: NO quotes, decimal format
                                 writeln!(file, "{}={}", clean_name, value)?;
                             }
                             SymbolType::String => {
                                 // String: Keep quotes
                                 writeln!(file, "{}=\"{}\"", clean_name, value)?;
                             }
-                            SymbolType::Range => {
+                            SymbolType::Range(_) => {
                                 // Range: [a,b,c] format without extra quotes
                                 writeln!(file, "{}={}", clean_name, value)?;
                             }
