@@ -63,15 +63,16 @@ pub fn menuconfig_command(kconfig: PathBuf, srctree: PathBuf) -> Result<()> {
         let choice_groups = collect_choice_groups(&ast.entries);
         enforce_choice_mutual_exclusion(&choice_groups, &mut symbol_table);
 
-        // Re-evaluate conditional defaults for derived symbols not in .config (Fix Bug 1)
-        // e.g. ARCH="x86_64" when ARCH_X86_64=y is loaded from .config
-        reevaluate_defaults(&ast.entries, &mut symbol_table);
-
-        // Filter out symbols loaded from .config that don't satisfy their if-block
-        // conditions, to prevent cross-architecture configuration pollution (Fix Bug 2)
+        // Filter out symbols in if-blocks whose conditions are not met.
+        // This runs BEFORE reevaluate_defaults so that derived symbols are recalculated
+        // with accurate if-block symbol values (e.g. PLATFORM_AARCH64_* cleared before PLATFORM is recalculated).
         let mut symbol_conditions = std::collections::HashMap::new();
         collect_symbol_if_conditions(&ast.entries, &[], &mut symbol_conditions);
         filter_by_if_conditions(&symbol_conditions, &mut symbol_table);
+
+        // Re-evaluate conditional defaults (Fix Bug 1).
+        // Derived symbols (no prompt) are ALWAYS recalculated (Linux Kconfig semantics).
+        reevaluate_defaults(&ast.entries, &mut symbol_table);
     } else {
         println!("No existing .config found, using defaults");
     }
@@ -205,8 +206,9 @@ fn enforce_choice_mutual_exclusion(
     }
 }
 
-/// Re-evaluate conditional defaults for symbols that were NOT loaded from .config.
-/// This fixes derived string configs like ARCH after ARCH_X86_64=y is loaded.
+/// Re-evaluate conditional defaults.
+/// Derived symbols (no prompt) are ALWAYS recalculated from defaults (Linux Kconfig semantics).
+/// User-editable symbols (has prompt) are only recalculated if not loaded from .config.
 fn reevaluate_defaults(
     entries: &[crate::kconfig::ast::Entry],
     symbol_table: &mut crate::kconfig::SymbolTable,
@@ -222,11 +224,12 @@ fn reevaluate_defaults(
                     .iter()
                     .any(|d| d.condition.is_some());
                 if has_conditional {
+                    let is_derived = config.is_derived();
                     let from_config = symbol_table
                         .get_symbol(&config.name)
                         .map(|s| s.from_config)
                         .unwrap_or(false);
-                    if !from_config {
+                    if is_derived || !from_config {
                         if let Some(default_value) =
                             config.properties.evaluate_default(symbol_table)
                         {
@@ -242,11 +245,12 @@ fn reevaluate_defaults(
                     .iter()
                     .any(|d| d.condition.is_some());
                 if has_conditional {
+                    let is_derived = menuconfig.is_derived();
                     let from_config = symbol_table
                         .get_symbol(&menuconfig.name)
                         .map(|s| s.from_config)
                         .unwrap_or(false);
-                    if !from_config {
+                    if is_derived || !from_config {
                         if let Some(default_value) =
                             menuconfig.properties.evaluate_default(symbol_table)
                         {
@@ -302,12 +306,14 @@ fn collect_symbol_if_conditions(
     }
 }
 
-/// Filter out symbols loaded from .config whose parent if-block conditions are not met.
-/// This removes cross-architecture configs (e.g. aarch64-specific when ARCH_X86_64=y).
+/// Filter out symbols in if-block conditions that are not met.
+/// Applies to ALL symbols (not just from_config) so that derived symbols are
+/// recalculated with accurate values from if-guarded choice defaults.
 fn filter_by_if_conditions(
     symbol_conditions: &std::collections::HashMap<String, Vec<crate::kconfig::ast::Expr>>,
     symbol_table: &mut crate::kconfig::SymbolTable,
 ) {
+    use crate::kconfig::ast::SymbolType;
     use crate::kconfig::expr::evaluate_expr;
 
     for (name, conditions) in symbol_conditions {
@@ -322,14 +328,13 @@ fn filter_by_if_conditions(
                         "Filtering config {} (parent conditions not satisfied)",
                         name
                     );
-                    use crate::kconfig::ast::SymbolType;
-                    match symbol.symbol_type {
-                        SymbolType::Bool | SymbolType::Tristate => {
-                            symbol_table.set_value(name, "n".to_string());
-                        }
-                        _ => {
-                            symbol_table.clear_value(name);
-                        }
+                }
+                match symbol.symbol_type {
+                    SymbolType::Bool | SymbolType::Tristate => {
+                        symbol_table.set_value(name, "n".to_string());
+                    }
+                    _ => {
+                        symbol_table.clear_value(name);
                     }
                 }
             }

@@ -99,7 +99,9 @@ fn enforce_choice_mutual_exclusion(
     }
 }
 
-/// Helper: re-evaluate conditional defaults for non-from_config symbols
+/// Helper: re-evaluate conditional defaults.
+/// Derived symbols (no prompt) are ALWAYS recalculated (Linux Kconfig semantics).
+/// User-editable symbols (has prompt) are only recalculated if not from_config.
 fn reevaluate_defaults(
     entries: &[xconfig::kconfig::ast::Entry],
     symbol_table: &mut SymbolTable,
@@ -114,11 +116,12 @@ fn reevaluate_defaults(
                     .iter()
                     .any(|d| d.condition.is_some());
                 if has_conditional {
+                    let is_derived = config.is_derived();
                     let from_config = symbol_table
                         .get_symbol(&config.name)
                         .map(|s| s.from_config)
                         .unwrap_or(false);
-                    if !from_config {
+                    if is_derived || !from_config {
                         if let Some(v) = config.properties.evaluate_default(symbol_table) {
                             symbol_table.set_value(&config.name, v);
                         }
@@ -171,7 +174,8 @@ fn collect_symbol_if_conditions(
     }
 }
 
-/// Helper: filter symbols loaded from .config with unsatisfied if-block conditions
+/// Helper: filter symbols in if-block conditions that are not met.
+/// Applies to ALL symbols (not just from_config).
 fn filter_by_if_conditions(
     symbol_conditions: &std::collections::HashMap<String, Vec<xconfig::kconfig::ast::Expr>>,
     symbol_table: &mut SymbolTable,
@@ -185,14 +189,12 @@ fn filter_by_if_conditions(
             .all(|cond| evaluate_expr(cond, symbol_table).unwrap_or(false));
         if !all_satisfied {
             if let Some(symbol) = symbol_table.get_symbol(name) {
-                if symbol.from_config {
-                    match symbol.symbol_type {
-                        SymbolType::Bool | SymbolType::Tristate => {
-                            symbol_table.set_value(name, "n".to_string());
-                        }
-                        _ => {
-                            symbol_table.clear_value(name);
-                        }
+                match symbol.symbol_type {
+                    SymbolType::Bool | SymbolType::Tristate => {
+                        symbol_table.set_value(name, "n".to_string());
+                    }
+                    _ => {
+                        symbol_table.clear_value(name);
                     }
                 }
             }
@@ -234,14 +236,53 @@ fn simulate_menuconfig_load(
 
         let choice_groups = collect_choice_groups(&ast.entries);
         enforce_choice_mutual_exclusion(&choice_groups, &mut symbol_table);
-        reevaluate_defaults(&ast.entries, &mut symbol_table);
 
+        // Filter BEFORE reevaluate so derived symbols are computed with correct if-block values
         let mut symbol_conditions = std::collections::HashMap::new();
         collect_symbol_if_conditions(&ast.entries, &[], &mut symbol_conditions);
         filter_by_if_conditions(&symbol_conditions, &mut symbol_table);
+
+        reevaluate_defaults(&ast.entries, &mut symbol_table);
     }
 
     symbol_table
+}
+
+/// Test 1: Broken defconfig with wrong ARCH= value is auto-corrected.
+/// A derived symbol (no prompt) should ALWAYS be recalculated from defaults,
+/// even if an incorrect value was explicitly stored in .config.
+#[test]
+fn test_broken_defconfig_arch_auto_corrected() {
+    let kconfig_path = std::path::PathBuf::from("tests/fixtures/arch_config/Kconfig");
+    let srctree = std::path::PathBuf::from("tests/fixtures/arch_config");
+
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".config");
+
+    // Broken .config: ARCH="aarch64" but ARCH_X86_64=y (contradictory)
+    let broken_config = "\
+ARCH=\"aarch64\"
+ARCH_X86_64=y
+PLATFORM=\"aarch64-qemu-virt\"
+PLATFORM_X86_64_QEMU_VIRT=y
+";
+    fs::write(&config_path, broken_config).unwrap();
+
+    let symbol_table = simulate_menuconfig_load(&kconfig_path, &srctree, &config_path);
+
+    // ARCH is derived (no prompt): must be recalculated to "x86_64"
+    assert_eq!(
+        symbol_table.get_value("ARCH"),
+        Some("x86_64".to_string()),
+        "Broken defconfig: ARCH should be auto-corrected to 'x86_64' (derived symbol)"
+    );
+
+    // PLATFORM is derived (no prompt): must be recalculated to "x86_64-qemu-virt"
+    assert_eq!(
+        symbol_table.get_value("PLATFORM"),
+        Some("x86_64-qemu-virt".to_string()),
+        "Broken defconfig: PLATFORM should be auto-corrected to 'x86_64-qemu-virt' (derived symbol)"
+    );
 }
 
 /// Bug 1: When loading a defconfig with ARCH_X86_64=y, ARCH should be "x86_64" not "aarch64"
