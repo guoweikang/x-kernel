@@ -1,6 +1,7 @@
 use crate::config::ConfigReader;
 use crate::error::Result;
 use crate::kconfig::{Parser, SymbolTable};
+use crate::ui::dependency_resolver::DependencyResolver;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -114,6 +115,26 @@ impl OldConfigLoader {
                 symbols.mark_from_config(&name);
             }
             // Silently ignore removed symbols
+        }
+
+        // Prune ghost values: clear any symbol whose dependency condition is not satisfied.
+        // This handles the case where a defconfig contains entries like PMU_IRQ=23 that
+        // "depends on ARCH_AARCH64" but the current config does not enable ARCH_AARCH64.
+        let mut resolver = DependencyResolver::new();
+        resolver.build_from_entries(&ast.entries);
+
+        // Collect ghost symbol names (those with values but unsatisfied dependencies)
+        // into an owned Vec first so we can mutate `symbols` afterward.
+        let ghost_names: Vec<String> = symbols
+            .all_symbols()
+            .filter(|(name, sym)| {
+                sym.value.is_some() && resolver.can_enable(name, &symbols).is_err()
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        for name in ghost_names {
+            symbols.clear_value(&name);
         }
 
         Ok((symbols, changes))

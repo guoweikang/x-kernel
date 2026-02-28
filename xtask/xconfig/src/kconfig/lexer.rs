@@ -448,6 +448,7 @@ impl Lexer {
                 "i64" => Token::I64,
                 "i128" => Token::I128,
                 "isize" => Token::Isize,
+                "int" => Token::I64,
                 "hex" => Token::Hex,
                 "prompt" => Token::Prompt,
                 "default" => Token::Default,

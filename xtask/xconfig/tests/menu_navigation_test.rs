@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use xconfig::kconfig::Parser;
-use xconfig::ui::state::ConfigState;
+use xconfig::ui::state::{ConfigState, MenuItemKind};
 
 /// Test that menu navigation returns the correct items for each menu
 #[test]
@@ -56,14 +56,10 @@ fn test_menu_content_alignment() {
         "Platform Selection menu should have items"
     );
 
-    // Check that Platform Selection contains platform-related items (using IDs not labels)
+    // Check that Platform Selection contains platform-related items (choice blocks or PLATFORM config)
     let has_platform_choices = platform_items.iter().any(|item| {
-        // Check for specific platform config IDs
-        item.id.contains("PLATFORM_AARCH64")
-            || item.id.contains("PLATFORM_RISCV64")
-            || item.id.contains("PLATFORM_X86_64")
-            || item.id.contains("PLATFORM_LOONGARCH64")
-            || item.id == "PLATFORM"
+        // Check for a Choice block (the platform choice menus) or the PLATFORM string config
+        matches!(item.kind, MenuItemKind::Choice { .. }) || item.id == "PLATFORM"
     });
     assert!(
         has_platform_choices,
