@@ -195,7 +195,7 @@ config BOOT_STACK_SIZE
       Specify the stack size for the boot process in bytes.
 
 config CPU_NUM
-    u32 "Number of CPUs"
+    usize "Number of CPUs"
     default 4
     help
       Specify the number of CPUs to simulate in the kernel.

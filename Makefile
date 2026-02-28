@@ -48,7 +48,7 @@ endif
 
 .DEFAULT_GOAL := all
 
-BUILD_TARGETS := all build run justrun debug clippy disasm
+BUILD_TARGETS := all build run justrun debug clippy disasm rootfs
 KCONFIG_TARGETS := menuconfig defconfig saveconfig oldconfig
 CLEAN_TARGETS := clean clean_c distclean
 UTILITY_TARGETS := clippy doc doc_check_missing fmt unittest unittest_no_fail_fast
