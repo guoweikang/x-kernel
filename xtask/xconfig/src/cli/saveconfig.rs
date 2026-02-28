@@ -45,7 +45,16 @@ fn extract_symbols_from_entries(
     entries: &[crate::kconfig::ast::Entry],
     symbols: &mut crate::kconfig::SymbolTable,
 ) {
+    extract_symbols_internal(entries, symbols, true);
+}
+
+fn extract_symbols_internal(
+    entries: &[crate::kconfig::ast::Entry],
+    symbols: &mut crate::kconfig::SymbolTable,
+    apply_defaults: bool,
+) {
     use crate::kconfig::ast::Entry;
+    use crate::kconfig::expr::evaluate_expr;
 
     for entry in entries {
         match entry {
@@ -54,17 +63,19 @@ fn extract_symbols_from_entries(
                 let clean_name = config.name.strip_prefix("CONFIG_").unwrap_or(&config.name);
                 symbols.add_symbol(clean_name.to_string(), config.symbol_type.clone());
 
-                // Use the new evaluate_default method
-                if let Some(default_value) = config.properties.evaluate_default(symbols) {
-                    symbols.set_value(clean_name, default_value);
-                } else {
-                    // If no default was applied, set to 'n' for bool/tristate
-                    match config.symbol_type {
-                        crate::kconfig::ast::SymbolType::Bool
-                        | crate::kconfig::ast::SymbolType::Tristate => {
-                            symbols.set_value(clean_name, "n".to_string());
+                if apply_defaults {
+                    // Use the new evaluate_default method
+                    if let Some(default_value) = config.properties.evaluate_default(symbols) {
+                        symbols.set_value(clean_name, default_value);
+                    } else {
+                        // If no default was applied, set to 'n' for bool/tristate
+                        match config.symbol_type {
+                            crate::kconfig::ast::SymbolType::Bool
+                            | crate::kconfig::ast::SymbolType::Tristate => {
+                                symbols.set_value(clean_name, "n".to_string());
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
@@ -75,17 +86,19 @@ fn extract_symbols_from_entries(
                     .unwrap_or(&menuconfig.name);
                 symbols.add_symbol(clean_name.to_string(), menuconfig.symbol_type.clone());
 
-                // Also evaluate defaults for menuconfig
-                if let Some(default_value) = menuconfig.properties.evaluate_default(symbols) {
-                    symbols.set_value(clean_name, default_value);
-                } else {
-                    // If no default was applied, set to 'n' for bool/tristate
-                    match menuconfig.symbol_type {
-                        crate::kconfig::ast::SymbolType::Bool
-                        | crate::kconfig::ast::SymbolType::Tristate => {
-                            symbols.set_value(clean_name, "n".to_string());
+                if apply_defaults {
+                    // Also evaluate defaults for menuconfig
+                    if let Some(default_value) = menuconfig.properties.evaluate_default(symbols) {
+                        symbols.set_value(clean_name, default_value);
+                    } else {
+                        // If no default was applied, set to 'n' for bool/tristate
+                        match menuconfig.symbol_type {
+                            crate::kconfig::ast::SymbolType::Bool
+                            | crate::kconfig::ast::SymbolType::Tristate => {
+                                symbols.set_value(clean_name, "n".to_string());
+                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
@@ -95,25 +108,31 @@ fn extract_symbols_from_entries(
                     symbols.add_symbol(clean_name.to_string(), option.symbol_type.clone());
                 }
 
-                // Apply choice default if specified
-                if let Some(default_name) = &choice.default {
-                    let clean_default =
-                        default_name.strip_prefix("CONFIG_").unwrap_or(default_name);
-                    symbols.set_value(clean_default, "y".to_string());
-                } else if let Some(first_option) = choice.options.first() {
-                    // No default specified, select first option (standard Kconfig behavior)
-                    let clean_name = first_option
-                        .name
-                        .strip_prefix("CONFIG_")
-                        .unwrap_or(&first_option.name);
-                    symbols.set_value(clean_name, "y".to_string());
+                if apply_defaults {
+                    // Apply choice default if specified
+                    if let Some(default_name) = &choice.default {
+                        let clean_default =
+                            default_name.strip_prefix("CONFIG_").unwrap_or(default_name);
+                        symbols.set_value(clean_default, "y".to_string());
+                    } else if let Some(first_option) = choice.options.first() {
+                        // No default specified, select first option (standard Kconfig behavior)
+                        let clean_name = first_option
+                            .name
+                            .strip_prefix("CONFIG_")
+                            .unwrap_or(&first_option.name);
+                        symbols.set_value(clean_name, "y".to_string());
+                    }
                 }
             }
             Entry::Menu(menu) => {
-                extract_symbols_from_entries(&menu.entries, symbols);
+                extract_symbols_internal(&menu.entries, symbols, apply_defaults);
             }
             Entry::If(if_entry) => {
-                extract_symbols_from_entries(&if_entry.entries, symbols);
+                // Only apply defaults inside this if-block when its condition is satisfied.
+                // Symbols are always registered regardless of condition.
+                let condition_met = apply_defaults
+                    && evaluate_expr(&if_entry.condition, symbols).unwrap_or(false);
+                extract_symbols_internal(&if_entry.entries, symbols, condition_met);
             }
             _ => {}
         }
