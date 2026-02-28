@@ -79,6 +79,13 @@ impl SymbolTable {
         }
     }
 
+    /// Clear the value of a symbol (set to None)
+    pub fn clear_value(&mut self, name: &str) {
+        if let Some(symbol) = self.symbols.get_mut(name) {
+            symbol.value = None;
+        }
+    }
+
     /// Get all new symbols
     pub fn get_new_symbols(&self) -> Vec<&Symbol> {
         self.symbols.values().filter(|s| s.is_new).collect()
