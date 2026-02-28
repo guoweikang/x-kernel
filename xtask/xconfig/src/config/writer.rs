@@ -46,15 +46,15 @@ impl ConfigWriter {
                                     };
                                 writeln!(file, "{}={}", clean_name, normalized_hex)?;
                             }
-                            SymbolType::Int => {
-                                // Int: NO quotes, decimal format
+                            ref ty if ty.is_integer_type() => {
+                                // Integer: NO quotes, decimal format
                                 writeln!(file, "{}={}", clean_name, value)?;
                             }
                             SymbolType::String => {
                                 // String: Keep quotes
                                 writeln!(file, "{}=\"{}\"", clean_name, value)?;
                             }
-                            SymbolType::Range => {
+                            SymbolType::Range(_) => {
                                 // Range: [a,b,c] format without extra quotes
                                 writeln!(file, "{}={}", clean_name, value)?;
                             }

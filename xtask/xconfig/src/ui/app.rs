@@ -172,9 +172,20 @@ impl MenuConfigApp {
                 SymbolType::Bool => ConfigValue::Bool(false),
                 SymbolType::Tristate => ConfigValue::Tristate(TristateValue::No),
                 SymbolType::String => ConfigValue::String(String::new()),
-                SymbolType::Int => ConfigValue::Int(0),
+                SymbolType::U8
+                | SymbolType::U16
+                | SymbolType::U32
+                | SymbolType::U64
+                | SymbolType::U128
+                | SymbolType::Usize
+                | SymbolType::I8
+                | SymbolType::I16
+                | SymbolType::I32
+                | SymbolType::I64
+                | SymbolType::I128
+                | SymbolType::Isize => ConfigValue::Int(0),
                 SymbolType::Hex => ConfigValue::Hex("0x0".to_string()),
-                SymbolType::Range => ConfigValue::Range("[]".to_string()),
+                SymbolType::Range(_) => ConfigValue::Range("[]".to_string()),
             };
             item.value = Some(default_val);
             false
@@ -190,7 +201,18 @@ impl MenuConfigApp {
                 _ => ConfigValue::Tristate(TristateValue::No),
             },
             SymbolType::String => ConfigValue::String(value.trim_matches('"').to_string()),
-            SymbolType::Int => ConfigValue::Int(value.parse().unwrap_or(0)),
+            SymbolType::U8
+            | SymbolType::U16
+            | SymbolType::U32
+            | SymbolType::U64
+            | SymbolType::U128
+            | SymbolType::Usize
+            | SymbolType::I8
+            | SymbolType::I16
+            | SymbolType::I32
+            | SymbolType::I64
+            | SymbolType::I128
+            | SymbolType::Isize => ConfigValue::Int(value.parse().unwrap_or(0)),
             SymbolType::Hex => {
                 let trimmed = value.trim();
                 // If already in hex format, normalize to lowercase
@@ -212,7 +234,7 @@ impl MenuConfigApp {
                     }
                 }
             }
-            SymbolType::Range => {
+            SymbolType::Range(_) => {
                 let trimmed = value.trim();
                 if trimmed.starts_with('[') && trimmed.ends_with(']') {
                     ConfigValue::Range(trimmed.to_string())
@@ -1192,7 +1214,7 @@ impl MenuConfigApp {
                     self.focus = PanelFocus::Dialog;
                     return Ok(());
                 }
-                SymbolType::Int => {
+                ty if ty.is_integer_type() => {
                     let current = match &item.value {
                         Some(ConfigValue::Int(i)) => *i,
                         _ => 0,
@@ -1222,7 +1244,7 @@ impl MenuConfigApp {
                     self.focus = PanelFocus::Dialog;
                     return Ok(());
                 }
-                SymbolType::Range => {
+                SymbolType::Range(_) => {
                     let current = match &item.value {
                         Some(ConfigValue::Range(r)) => r.clone(),
                         _ => "[]".to_string(),

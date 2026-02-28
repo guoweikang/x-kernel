@@ -2,6 +2,7 @@ use std::fs;
 use tempfile::TempDir;
 use xconfig::config::{ConfigReader, ConfigWriter};
 use xconfig::kconfig::{SymbolTable, SymbolType};
+use xconfig::kconfig::ast::RangeType;
 
 #[test]
 fn test_config_reader() {
@@ -78,9 +79,9 @@ fn test_config_writer_int_no_quotes() {
     let config_path = temp_dir.path().join("test.config");
 
     let mut symbols = SymbolTable::new();
-    symbols.add_symbol("MAX_CPUS".to_string(), SymbolType::Int);
+    symbols.add_symbol("MAX_CPUS".to_string(), SymbolType::U32);
     symbols.set_value("MAX_CPUS", "102".to_string());
-    symbols.add_symbol("LOG_LEVEL".to_string(), SymbolType::Int);
+    symbols.add_symbol("LOG_LEVEL".to_string(), SymbolType::U32);
     symbols.set_value("LOG_LEVEL", "4".to_string());
 
     ConfigWriter::write(&config_path, &symbols).unwrap();
@@ -170,7 +171,7 @@ fn test_config_writer_all_types() {
     symbols.set_value("ARM64", "y".to_string());
 
     // Int type
-    symbols.add_symbol("MAX_CPUS".to_string(), SymbolType::Int);
+    symbols.add_symbol("MAX_CPUS".to_string(), SymbolType::U32);
     symbols.set_value("MAX_CPUS", "102".to_string());
 
     // Hex type
@@ -257,13 +258,13 @@ fn test_config_writer_none_values_by_type() {
     symbols.add_symbol("STRING_NONE".to_string(), SymbolType::String);
     // value is None by default
 
-    symbols.add_symbol("INT_NONE".to_string(), SymbolType::Int);
+    symbols.add_symbol("INT_NONE".to_string(), SymbolType::U32);
     // value is None by default
 
     symbols.add_symbol("HEX_NONE".to_string(), SymbolType::Hex);
     // value is None by default
 
-    symbols.add_symbol("RANGE_NONE".to_string(), SymbolType::Range);
+    symbols.add_symbol("RANGE_NONE".to_string(), SymbolType::Range(RangeType::Unknown));
     // value is None by default
 
     // Add some symbols with values for comparison
