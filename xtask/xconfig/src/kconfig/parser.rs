@@ -22,7 +22,7 @@ fn token_to_integer_symbol_type(token: &Token) -> SymbolType {
         Token::I64 => SymbolType::I64,
         Token::I128 => SymbolType::I128,
         Token::Isize => SymbolType::Isize,
-        _ => panic!("token_to_integer_symbol_type called with non-integer token: {:?}", token),
+        _ => unreachable!("token_to_integer_symbol_type called with non-integer token: {:?}", token),
     }
 }
 
