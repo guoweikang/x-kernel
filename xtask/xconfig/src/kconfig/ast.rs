@@ -102,11 +102,25 @@ pub struct Config {
     pub properties: Property,
 }
 
+impl Config {
+    /// Returns true if this is a derived symbol (no prompt, value always computed from defaults).
+    pub fn is_derived(&self) -> bool {
+        self.properties.prompt.is_none()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MenuConfig {
     pub name: String,
     pub symbol_type: SymbolType,
     pub properties: Property,
+}
+
+impl MenuConfig {
+    /// Returns true if this is a derived symbol (no prompt, value always computed from defaults).
+    pub fn is_derived(&self) -> bool {
+        self.properties.prompt.is_none()
+    }
 }
 
 #[derive(Debug, Clone)]
