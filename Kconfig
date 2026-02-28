@@ -208,6 +208,7 @@ config TICKS_PER_SECOND
 
 config SEV_CBIT_POS
     int "SEV CBIT Position"
+    depends on ARCH_X86_64
     default 47
     help
       Specify the bit position of the SEV CBIT in the page table entries.
