@@ -5,11 +5,10 @@
 //! Memory layout definitions for x86_64-qemu-virt.
 
 use heapless::Vec;
+use kbuild_config::{MMIO_RANGES, PHYS_VIRT_OFFSET};
 use kplat::memory::{HwMemory, MemRange, PhysAddr, VirtAddr, pa, va};
 use lazyinit::LazyInit;
 use multiboot::information::{MemoryManagement, MemoryType, Multiboot, PAddr};
-
-use crate::config::{devices::MMIO_RANGES, plat::PHYS_VIRT_OFFSET};
 const MAX_REGIONS: usize = 16;
 static RAM_REGIONS: LazyInit<Vec<MemRange, MAX_REGIONS>> = LazyInit::new();
 /// Initializes RAM region list from multiboot information.
@@ -56,10 +55,7 @@ impl HwMemory for HwMemoryImpl {
     }
 
     fn dma_regions() -> &'static [MemRange] {
-        &[(
-            crate::config::plat::DMA_MEM_BASE,
-            crate::config::plat::DMA_MEM_SIZE,
-        )]
+        &[(kbuild_config::DMA_MEM_BASE, kbuild_config::DMA_MEM_SIZE)]
     }
 
     fn p2v(paddr: PhysAddr) -> VirtAddr {
@@ -72,8 +68,8 @@ impl HwMemory for HwMemoryImpl {
 
     fn kernel_layout() -> (VirtAddr, usize) {
         (
-            va!(crate::config::plat::KERNEL_ASPACE_BASE),
-            crate::config::plat::KERNEL_ASPACE_SIZE,
+            va!(kbuild_config::KERNEL_ASPACE_BASE),
+            kbuild_config::KERNEL_ASPACE_SIZE,
         )
     }
 }

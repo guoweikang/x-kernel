@@ -5,8 +5,8 @@
 //! SMP bring-up helpers for the runtime.
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use kbuild_config::{CPU_NUM, TASK_STACK_SIZE};
 use khal::mem::{VirtAddr, v2p};
-use platconfig::{TASK_STACK_SIZE, plat::CPU_NUM};
 
 #[unsafe(link_section = ".bss.stack")]
 static mut SECONDARY_BOOT_STACK: [[u8; TASK_STACK_SIZE]; CPU_NUM - 1] =
@@ -64,7 +64,7 @@ pub fn rust_main_secondary(cpu_id: usize) -> ! {
     }
 
     #[cfg(feature = "pmu")]
-    khal::irq::enable(platconfig::devices::PMU_IRQ, true);
+    khal::irq::enable(kbuild_config::PMU_IRQ, true);
 
     khal::asm::enable_local();
 

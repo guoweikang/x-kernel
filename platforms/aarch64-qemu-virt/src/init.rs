@@ -4,14 +4,14 @@
 
 //! Platform initialization hooks for aarch64-qemu-virt.
 
+#[allow(unused_imports)]
+use kbuild_config::{
+    GICC_PADDR, GICD_PADDR, PSCI_METHOD, RTC_PADDR, TIMER_IRQ, UART_IRQ, UART_PADDR,
+};
 use kplat::{
     boot::BootHandler,
     memory::{p2v, pa},
 };
-
-#[allow(unused_imports)]
-use crate::config::devices::{GICC_PADDR, GICD_PADDR, RTC_PADDR, TIMER_IRQ, UART_IRQ, UART_PADDR};
-use crate::config::plat::PSCI_METHOD;
 struct BootHandlerImpl;
 #[impl_dev_interface]
 impl BootHandler for BootHandlerImpl {
