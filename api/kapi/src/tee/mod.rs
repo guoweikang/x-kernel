@@ -53,6 +53,7 @@ use crate::tee::{
 #[macro_use]
 mod macros;
 
+mod arch;
 mod bitstring;
 mod common;
 mod config;
@@ -75,8 +76,6 @@ mod tee_cancel;
 mod tee_fs;
 mod tee_fs_key_manager;
 mod tee_generic;
-#[cfg(feature = "x86_csv")]
-mod tee_get_sealing_key;
 mod tee_inter_ta;
 mod tee_misc;
 mod tee_obj;
@@ -353,8 +352,8 @@ pub fn dispatch_irq_tee_syscall(sysno: Sysno, uctx: &mut UserContext) -> TeeResu
 
             cfg_if::cfg_if! {
                 if #[cfg(target_arch = "aarch64")] {
-                    let len = uctx.x[6] as usize;
-                    let obj_ptr = uctx.x[7] as *mut c_uint;
+                    len = uctx.x[6] as usize;
+                    obj_ptr = uctx.x[7] as *mut c_uint;
                 } else if #[cfg(target_arch = "x86_64")] {
                     len = uctx.r12 as usize;
                     obj_ptr = uctx.r13 as *mut c_uint;
