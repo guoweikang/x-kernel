@@ -137,6 +137,8 @@ pub fn init_secondary() {
 }
 mod irq_impl {
     use kplat::interrupts::{Handler, HandlerTable, IntrManager, TargetCpu};
+    use super::*;
+
     const MAX_IRQ_COUNT: usize = 256;
     const IO_APIC_VECTOR_BASE: usize = 0x20; // 收敛到底层 外部只看到IRQ编号，不暴露CPU Vector细节
 
@@ -166,18 +168,31 @@ mod irq_impl {
 
         // 外部中断进来的是 CPU Vector，我们需要在这里转换回 IRQ 抛给框架
         fn dispatch_irq(vector: usize) -> Option<usize> {
-            if vector < IO_APIC_VECTOR_BASE {
-                return None; // 非设备中断
-            }
-            let irq = vector - IO_APIC_VECTOR_BASE;
+            let irq = if vector >= APIC_TIMER_VECTOR as usize {
+                // 1. Local APIC 内部中断 (Timer=240, Spurious=241, Error=242 等)
+                // 它们不经过 IO-APIC，不需要减去偏移，直接把 Vector 当作逻辑 IRQ 传递
+                vector
+            } else if vector >= IO_APIC_VECTOR_BASE {
+                // 2. IO-APIC 外设中断 (如 PCI 网络、块设备)
+                // 它们的 Vector 是我们在初始化时通过 0x20 + irq 映射的，需要还原
+                vector - IO_APIC_VECTOR_BASE
+            } else {
+                // 3. 异常 (0-31) 不应该进入外设中断派发器
+                return None;
+            };
 
-            trace!("IRQ {}", irq);
-            if !IRQ_HANDLER_TABLE.handle(irq) {
-                // 如果使用异�� poll 机制，这里可能不会命中 handler，会走到 ktask 的 hook
-                // warn!("Unhandled IRQ {irq}"); 可以考虑去掉或降级为 debug
+            if irq != APIC_TIMER_VECTOR as usize {
+                // 屏蔽高频的 Timer 日志，只打印外设 IRQ
+                trace!("IRQ {}", irq);
             }
+
+            if !IRQ_HANDLER_TABLE.handle(irq) {
+                // 对于异步 poll 机制，因为走的是 IRQ_HOOK，这里如果打印 warning 会刷屏，所以静默或调低日志级别即可
+                warn!("Unhandled IRQ {}", irq);
+            }
+
             unsafe { super::local_apic().end_of_interrupt() };
-            Some(irq) // 向框架传递真实的 IRQ 号
+            Some(irq) // 向框架传递真实的逻辑 IRQ 号
         }
 
         fn notify_cpu(interrupt_id: usize, target: TargetCpu) {

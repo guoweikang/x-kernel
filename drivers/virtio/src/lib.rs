@@ -97,10 +97,18 @@ pub fn probe_pci_device<H: VirtIoHal>(
         // 读取 PCI 配置空间偏移 0x3C 处的值 (Interrupt Line)
         // 注意：根据你的 pci crate 实现，如果原生支持 read8，可以直接调用
         // 这里假设底层提供 32 位读取能力，0x3C 的最低 8 位即为 Interrupt Line
-        let config_data = root.read(bdf, 0x3C);
-        let irq_line = (config_data & 0xFF) as usize;
+        // let config_data = root.read(bdf, 0x3C);
+        // let irq_line = (config_data & 0xFF) as usize;
+        // irq_line // 直接返回 IRQ (例如 10 或是 11)，不要在这里加 CPU Vector 偏移！
 
-        irq_line // 直接返回 IRQ (例如 10 或是 11)，不要在这里加 CPU Vector 偏移！
+        // 由于 virtio-drivers 封装了 PciRoot 的配置空间读取能力，
+        // 这里暂时硬编码 QEMU i440fx 主板的默认 PCI IRQ 路由 (PIRQ 轮转)。
+        // 注意：这里只返回纯 IRQ 号 (10, 11)，绝对不要加上 CPU Vector 的偏移！
+        match bdf.device {
+                0..=3 => 11,
+                4..=7 => 10,
+            _ => 11,
+        }
     };
 
     #[cfg(not(target_arch = "x86_64"))]
