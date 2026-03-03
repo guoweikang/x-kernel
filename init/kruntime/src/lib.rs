@@ -298,6 +298,19 @@ fn init_interrupt() {
         }
         unsafe { NEXT_DEADLINE.write_current_raw(deadline + PERIODIC_INTERVAL_NANOS) };
         khal::time::arm_timer(deadline);
+
+        // 添加计数器用于周期性打印
+        #[percpu::def_percpu]
+        static TIMER_TICK_COUNT: u64 = 0;
+        // 添加日志: 每100次打印一次(1秒)
+        unsafe {
+            let count = TIMER_TICK_COUNT.read_current_raw();
+            TIMER_TICK_COUNT.write_current_raw(count + 1);
+            if count % 100 == 0 {
+                info!("Timer tick #{}, now={}, deadline={}", count, now_ns, deadline);
+            }
+        }
+
     }
 
     khal::irq::register(khal::time::interrupt_id(), || {

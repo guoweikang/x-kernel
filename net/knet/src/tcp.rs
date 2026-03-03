@@ -6,7 +6,7 @@
 use alloc::{boxed::Box, sync::Arc, vec};
 use core::{
     net::{Ipv4Addr, SocketAddr},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, Ordering, AtomicUsize},
     task::Context,
 };
 
@@ -343,15 +343,28 @@ impl SocketOps for TcpSocket {
         }
 
         let bound_port = self.bound_endpoint()?.port;
+
+        info!("TCP accept starting on port {}", bound_port);
+
+        let mut attempt_count = 0;
+
+
         self.general.recv_poller(self, || {
+            attempt_count += 1;
+            if attempt_count == 1 || attempt_count % 10 == 0 {
+                info!("TCP accept attempt #{} on port {}", attempt_count, bound_port);
+            }
             poll_interfaces();
+
+            let can_accept = LISTEN_TABLE.can_accept(bound_port);
+            if attempt_count <= 3 || attempt_count % 10 == 0 {
+                info!("  can_accept result: {:?}", can_accept);
+            }
+
             LISTEN_TABLE.accept(bound_port).map(|dispatch_irq| {
                 let socket = TcpSocket::new_connected(dispatch_irq);
-                debug!(
-                    "accepted connection from {}, {}",
-                    dispatch_irq,
-                    socket.with_smol_socket(|socket| socket.remote_endpoint().unwrap())
-                );
+                let remote = socket.with_smol_socket(|socket| socket.remote_endpoint().unwrap());
+                info!("✓ Accepted connection from {} after {} attempts", remote, attempt_count);
                 Socket::Tcp(Box::new(socket))
             })
         })
@@ -470,6 +483,12 @@ impl SocketOps for TcpSocket {
 
 impl Pollable for TcpSocket {
     fn poll(&self) -> IoEvents {
+        static POLL_COUNT: AtomicUsize = AtomicUsize::new(0);
+        let count = POLL_COUNT.fetch_add(1, Ordering::Relaxed);
+        if count % 100 == 0 {
+            info!("TcpSocket::poll called #{} for state {:?}", count, self.state());
+        }
+
         poll_interfaces();
         let mut events = match self.state() {
             State::Connecting => self.poll_connect(),
@@ -478,10 +497,19 @@ impl Pollable for TcpSocket {
             State::Busy => IoEvents::empty(),
         };
         events.set(IoEvents::RDHUP, self.rx_closed.load(Ordering::Acquire));
+
+        if count % 100 == 0 {
+            info!("  -> events: {:?}", events);
+        }
+
         events
     }
 
     fn register(&self, context: &mut Context<'_>, events: IoEvents) {
+
+        info!("TcpSocket::register called, events={:?}", events);
+
+
         if events.intersects(IoEvents::IN | IoEvents::OUT | IoEvents::RDHUP) {
             self.general.register_rx_waker(context.waker());
         }

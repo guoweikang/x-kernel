@@ -89,18 +89,36 @@ pub fn probe_pci_device<H: VirtIoHal>(
 ) -> Option<(DeviceKind, PciTransport, usize)> {
     use virtio_drivers::transport::pci::virtio_device_type;
 
-    #[cfg(target_arch = "x86_64")]
-    const PCI_IRQ_BASE: usize = 0x20;
-    #[cfg(target_arch = "riscv64")]
-    const PCI_IRQ_BASE: usize = 0x20;
-    #[cfg(target_arch = "loongarch64")]
-    const PCI_IRQ_BASE: usize = 0x10;
-    #[cfg(target_arch = "aarch64")]
-    const PCI_IRQ_BASE: usize = 0x23;
-
     let dev_kind = virtio_device_type(dev_info).and_then(as_device_kind)?;
-    let transport = PciTransport::new::<H>(root, bdf).ok()?;
-    let irq = PCI_IRQ_BASE + (bdf.device & 3) as usize;
+    let transport = PciTransport::new::<H, C>(root, bdf).ok()?;
+
+    #[cfg(target_arch = "x86_64")]
+    let irq = {
+        // x86_64: IRQ line → CPU vector映射
+        // QEMU virtio设备的IRQ line:
+        // - device 0-3: IRQ 11 → CPU vector 43 (0x20 + 11)
+        // - device 4-7: IRQ 10 → CPU vector 42 (0x20 + 10)
+        const IO_APIC_VECTOR_BASE: usize = 0x20;
+        let irq_line = match bdf.device {
+            0..=3 => 11,
+            4..=7 => 10,
+            _ => 11,
+        };
+        IO_APIC_VECTOR_BASE + irq_line  // 返回CPU vector!
+    };
+
+    #[cfg(not(target_arch = "x86_64"))]
+    let irq = {
+        #[cfg(target_arch = "loongarch64")]
+        const PCI_IRQ_BASE: usize = 0x10;
+        #[cfg(target_arch = "aarch64")]
+        const PCI_IRQ_BASE: usize = 0x23;
+        #[cfg(target_arch = "riscv64")]
+        const PCI_IRQ_BASE: usize = 0x20;
+        PCI_IRQ_BASE + (bdf.device & 3) as usize
+    };
+
+    log::info!("PCI virtio device at {:?}: IRQ = {}", bdf, irq);
     Some((dev_kind, transport, irq))
 }
 

@@ -67,6 +67,7 @@ impl Service {
     }
 
     pub fn register_rx_waker(&mut self, mask: u32, waker: &Waker) {
+        info!("Service::register_rx_waker mask={:#x}", mask);
         let next = self.iface.poll_at(now(), &SOCKET_SET.inner.lock());
 
         if let Some(t) = next {
@@ -88,6 +89,7 @@ impl Service {
 
         for (i, device) in self.router.devices.iter().enumerate() {
             if mask & (1 << i) != 0 {
+                info!("  -> Registering waker for device {}: {}", i, device.name());
                 device.register_rx_waker(waker);
             }
         }
