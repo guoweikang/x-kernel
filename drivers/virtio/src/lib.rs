@@ -94,17 +94,13 @@ pub fn probe_pci_device<H: VirtIoHal>(
 
     #[cfg(target_arch = "x86_64")]
     let irq = {
-        // x86_64: IRQ line → CPU vector映射
-        // QEMU virtio设备的IRQ line:
-        // - device 0-3: IRQ 11 → CPU vector 43 (0x20 + 11)
-        // - device 4-7: IRQ 10 → CPU vector 42 (0x20 + 10)
-        const IO_APIC_VECTOR_BASE: usize = 0x20;
-        let irq_line = match bdf.device {
-            0..=3 => 11,
-            4..=7 => 10,
-            _ => 11,
-        };
-        IO_APIC_VECTOR_BASE + irq_line  // 返回CPU vector!
+        // 读取 PCI 配置空间偏移 0x3C 处的值 (Interrupt Line)
+        // 注意：根据你的 pci crate 实现，如果原生支持 read8，可以直接调用
+        // 这里假设底层提供 32 位读取能力，0x3C 的最低 8 位即为 Interrupt Line
+        let config_data = root.read(bdf, 0x3C);
+        let irq_line = (config_data & 0xFF) as usize;
+
+        irq_line // 直接返回 IRQ (例如 10 或是 11)，不要在这里加 CPU Vector 偏移！
     };
 
     #[cfg(not(target_arch = "x86_64"))]

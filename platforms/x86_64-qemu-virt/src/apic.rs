@@ -28,46 +28,34 @@ const IO_APIC_BASE: PhysAddr = pa!(0xFEC0_0000);
 static mut LOCAL_APIC: MaybeUninit<LocalApic> = MaybeUninit::uninit();
 static mut IS_X2APIC: bool = false;
 static IO_APIC: LazyInit<SpinNoIrq<IoApic>> = LazyInit::new();
-/// Enables or disables the IO APIC line for the given vector.
-pub fn enable(vector: usize, enabled: bool) {
-    info!("X86_64 enable IRQ: vector={} (0x{:x}), enabled={}", vector, vector, enabled);
-    
-    if vector < APIC_TIMER_VECTOR as _ {
-        const IO_APIC_VECTOR_BASE: usize = 0x20;
-        
-        if vector >= IO_APIC_VECTOR_BASE && vector < APIC_TIMER_VECTOR as usize {
-            let irq_line = vector - IO_APIC_VECTOR_BASE;
-            
-            unsafe {
-                let mut io_apic = IO_APIC.lock();
-                
-                if irq_line <= io_apic.max_table_entry() as usize {
-                    let before = io_apic.table_entry(irq_line as u8);
-                    info!("  Before: RTE[{}] vector={}, flags={:?}", 
-                          irq_line, before.vector(), before.flags());
-                    
-                    // ✅ 关键：先检查是否有handler
-                    if enabled {
-                        // 检查handler是否已注册
-                        if !IRQ_HANDLER_TABLE.has_handler(vector) {
-                            warn!("  WARNING: Enabling IRQ {} before handler registered!", vector);
-                            // 仍然允许enable,但记录警告
-                        }
-                        io_apic.enable_irq(irq_line as u8);
-                    } else {
-                        io_apic.disable_irq(irq_line as u8);
-                    }
-                    
-                    let after = io_apic.table_entry(irq_line as u8);
-                    info!("  After:  RTE[{}] vector={}, flags={:?}", 
-                          irq_line, after.vector(), after.flags());
+/// Enables or disables the IO APIC line for the given irq number.
+
+
+pub fn enable(irq: usize, enabled: bool) {
+    info!("X86_64 enable IRQ: {}, enabled={}", irq, enabled);
+    // 注意：传进来的是 IRQ，我们计算出 Vector 用于越界保护
+    let vector = 0x20 + irq;
+
+    if vector < APIC_TIMER_VECTOR as usize {
+        unsafe {
+            let mut io_apic = IO_APIC.lock();
+
+            if irq <= io_apic.max_table_entry() as usize {
+                // 在 Enable 阶段动态覆写配置（解决 x86 的 Level/Edge 配置差异）
+                // 我们统一将所有开启的 IO-APIC 引脚配制为 边沿触发、低电平
+                let mut entry = io_apic.table_entry(irq as u8);
+                entry.set_flags(IrqFlags::LOW_ACTIVE); // 注意不要带 LEVEL_TRIGGERED
+
+                if enabled {
+                    io_apic.set_table_entry(irq as u8, entry); // 写入配置
+                    io_apic.enable_irq(irq as u8);             // 解除掩码
+                } else {
+                    io_apic.disable_irq(irq as u8);            // 加上掩码
                 }
             }
         }
     }
 }
-
-
 
 /// Returns a mutable reference to the local APIC.
 #[allow(static_mut_refs)]
@@ -133,25 +121,7 @@ pub fn init_primary() {
             entry.set_dest(0);                           // 发送给CPU 0
             entry.set_mode(IrqMode::Fixed);              // Fixed模式
             entry.set_flags(IrqFlags::MASKED);           // 默认mask
-
             io_apic.set_table_entry(irq, entry);
-        }
-
-        // ✅ 配置PCI IRQ的触发模式
-        for irq in [10, 11] {
-            let mut entry = RedirectionTableEntry::default();
-            entry.set_vector((0x20 + irq) as u8);
-            entry.set_dest(0);
-            entry.set_mode(IrqMode::Fixed);
-            // Level-triggered, Low-active, Masked
-            entry.set_flags(IrqFlags::LEVEL_TRIGGERED | IrqFlags::LOW_ACTIVE | IrqFlags::MASKED);
-
-            io_apic.set_table_entry(irq, entry);
-
-            // 验证
-            let verify = io_apic.table_entry(irq);
-            info!("  IRQ {}: vector={} (0x{:x}), dest={}, mode={:?}, flags={:?}", 
-                  irq, verify.vector(), verify.vector(), verify.dest(), verify.mode(), verify.flags());
         }
 
         info!("IO-APIC initialized and masked");
@@ -168,39 +138,46 @@ pub fn init_secondary() {
 mod irq_impl {
     use kplat::interrupts::{Handler, HandlerTable, IntrManager, TargetCpu};
     const MAX_IRQ_COUNT: usize = 256;
+    const IO_APIC_VECTOR_BASE: usize = 0x20; // 收敛到底层 外部只看到IRQ编号，不暴露CPU Vector细节
+
     static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
     struct IntrManagerImpl;
+
+
     #[impl_dev_interface]
     impl IntrManager for IntrManagerImpl {
-        fn enable(vector: usize, enabled: bool) {
-            super::enable(vector, enabled);
+        fn enable(irq: usize, enabled: bool) {
+            super::enable(irq, enabled);
         }
 
-        fn reg_handler(vector: usize, handler: Handler) -> bool {
-            if IRQ_HANDLER_TABLE.register_handler(vector, handler) {
-                Self::enable(vector, true);
+        fn reg_handler(irq: usize, handler: Handler) -> bool {
+            if IRQ_HANDLER_TABLE.register_handler(irq, handler) {
+                Self::enable(irq, true);
                 return true;
             }
-            warn!("reg_handler handler for IRQ {} failed", vector);
+            warn!("reg_handler handler for IRQ {} failed", irq);
             false
         }
 
-        fn unreg_handler(vector: usize) -> Option<Handler> {
-            Self::enable(vector, false);
-            IRQ_HANDLER_TABLE.unregister_handler(vector)
+        fn unreg_handler(irq: usize) -> Option<Handler> {
+            Self::enable(irq, false);
+            IRQ_HANDLER_TABLE.unregister_handler(irq)
         }
 
+        // 外部中断进来的是 CPU Vector，我们需要在这里转换回 IRQ 抛给框架
         fn dispatch_irq(vector: usize) -> Option<usize> {
-            if vector != 240 {
-                info!("X86_64 IRQ vector: {} (0x{:x})", vector, vector);  // ← 添加这行
+            if vector < IO_APIC_VECTOR_BASE {
+                return None; // 非设备中断
             }
+            let irq = vector - IO_APIC_VECTOR_BASE;
 
-            trace!("IRQ {}", vector);
-            if !IRQ_HANDLER_TABLE.handle(vector) {
-                warn!("Unhandled IRQ {vector}");
+            trace!("IRQ {}", irq);
+            if !IRQ_HANDLER_TABLE.handle(irq) {
+                // 如果使用异�� poll 机制，这里可能不会命中 handler，会走到 ktask 的 hook
+                // warn!("Unhandled IRQ {irq}"); 可以考虑去掉或降级为 debug
             }
             unsafe { super::local_apic().end_of_interrupt() };
-            Some(vector)
+            Some(irq) // 向框架传递真实的 IRQ 号
         }
 
         fn notify_cpu(interrupt_id: usize, target: TargetCpu) {
