@@ -94,6 +94,9 @@ GDB ?= gdb
 OUT_DIR ?= $(PWD)
 LD_SCRIPT ?= $(abspath $(TARGET_DIR)/$(TARGET)/$(MODE)/linker_$(PLAT_NAME).lds)
 
+# Generate Rust const definitions from .config
+CONFIG_RS := $(TARGET_DIR)/kbuild/config.rs
+
 APP_NAME := xkernel
 OUT_ELF := $(OUT_DIR)/$(APP_NAME)_$(PLAT_NAME).elf
 OUT_BIN := $(patsubst %.elf,%.bin,$(OUT_ELF))
@@ -156,13 +159,18 @@ oldconfig:
 	fi
 	@xconf oldconfig -c .config -k Kconfig -s .
 
-# Generate const definitions before build
-gen-const: .config
+
+# 只在 .config 更新时才生成
+$(CONFIG_RS): .config
 	@echo "📝 Generating Rust const definitions from .config..."
 	@xconf gen-const
 	@echo "✅ Generated config.rs"
 
-build: gen-const $(OUT_DIR) $(FINAL_IMG)
+
+# Generate const definitions before build
+gen-const: $(CONFIG_RS)
+
+build: $(CONFIG_RS) $(OUT_DIR) $(FINAL_IMG)
 
 disasm:
 	$(OBJDUMP) $(OUT_ELF) | less
@@ -180,7 +188,7 @@ debug: build
 	  -ex 'continue' \
 	  -ex 'disp /16i $$pc'
 
-clippy: gen-const
+clippy: $(CONFIG_RS)
 ifeq ($(origin ARCH), command line)
 	$(call cargo_clippy,--target $(TARGET))
 else
@@ -221,6 +229,8 @@ distclean: clean
 clean_c::
 	rm -rf $(app-objs)
 
+# Note: gen-const is kept as PHONY to allow manual invocation,
+# but the actual dependency is on $(CONFIG_RS) which is file-based
 .PHONY: all defconfig oldconfig menuconfig saveconfig gen-const \
 	build disasm run justrun debug \
 	clippy doc doc_check_missing fmt fmt_c unittest unittest_no_fail_fast \
