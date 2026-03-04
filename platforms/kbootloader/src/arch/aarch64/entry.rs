@@ -67,6 +67,7 @@ unsafe extern "C" fn _start_primary() -> ! {
 
         // 7. Enable MMU (pass L0 page table physical address)
         "adrp    x0, {boot_pt}",
+        "add     x0, x0, :lo12:{boot_pt}",
         "bl      {init_mmu}",
 
         // 8. Switch stack to high virtual address

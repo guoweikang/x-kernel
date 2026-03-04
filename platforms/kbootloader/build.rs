@@ -41,6 +41,7 @@ fn main() {
     fs::write(&linker_script_path, linker_script)
         .expect("Failed to write linker script");
 
+    println!("cargo:rustc-codegen=relocation-model=pic");
     println!("cargo:rustc-link-arg=-T{}", linker_script_path.display());
     println!("cargo:rustc-link-arg=-pie");
     println!("cargo:rustc-link-arg=-Bsymbolic");
