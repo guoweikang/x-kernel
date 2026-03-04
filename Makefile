@@ -29,6 +29,8 @@
 # Enable unstable features
 export RUSTC_BOOTSTRAP := 1
 export DWARF := y
+export DISK_IMG ?= $(PWD)/disk.img
+XCONF = env RUSTFLAGS= CARGO_ENCODED_RUSTFLAGS= cargo run --manifest-path xtask/xconfig/Cargo.toml --bin xconf --
 
 V ?=
 LTO ?=
@@ -126,7 +128,7 @@ endif # end of IS_BUILD
 
 
 menuconfig:
-	@xconf menuconfig -k Kconfig -s .
+	@$(XCONF) menuconfig -k Kconfig -s .
 	@if [ -f .config ]; then \
 		echo "✅ Configuration saved to .config"; \
 	else \
@@ -145,11 +147,11 @@ teefs:
 	$(MAKE) -C tee_apps ARCH=$(ARCH)
 
 defconfig:
-	@xconf saveconfig -o .config -k Kconfig -s .
+	@$(XCONF) saveconfig -o .config -k Kconfig -s .
 	@echo "✅ Default configuration saved to .config"
 
 saveconfig:
-	@xconf saveconfig -o .config -k Kconfig -s .
+	@$(XCONF) saveconfig -o .config -k Kconfig -s .
 
 oldconfig:
 	@if [ ! -f .config ]; then \
@@ -157,13 +159,13 @@ oldconfig:
 		echo "Please run 'make defconfig' or 'make menuconfig' first."; \
 		exit 1; \
 	fi
-	@xconf oldconfig -c .config -k Kconfig -s .
+	@$(XCONF) oldconfig -c .config -k Kconfig -s .
 
 
 # 只在 .config 更新时才生成
 $(CONFIG_RS): .config
 	@echo "📝 Generating Rust const definitions from .config..."
-	@xconf gen-const
+	@$(XCONF) gen-const
 	@echo "✅ Generated config.rs"
 
 
