@@ -1,0 +1,36 @@
+[package]
+name = "kbootloader"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords = ["bootloader", "x-kernel", "multi-arch", "position-independent"]
+description = "Position-independent bootloader for x-kernel (multi-arch)"
+
+[dependencies]
+kbuild_config = { workspace = true }
+
+# Architecture-specific dependencies
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+aarch64-cpu = "9"
+cortex-a = "8"
+
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+riscv = "0.11"
+
+[features]
+default = []
+
+# Enable verbose boot logging
+debug-print = []
+
+[lib]
+name = "kbootloader"
+crate-type = ["staticlib"]
+
+[profile.release]
+opt-level = 2
+lto = "thin"
+
