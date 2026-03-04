@@ -140,13 +140,5 @@ pub fn init_vsock(mut vsock_devs: DeviceContainer<VsockDevice>) {
 }
 
 pub fn poll_interfaces() {
-    use core::sync::atomic::{AtomicUsize, Ordering};
-    static POLL_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-    let count = POLL_COUNT.fetch_add(1, Ordering::Relaxed);
-    // 每100次打印一次
-    if count % 100 == 0 {
-        info!("poll_interfaces called #{}", count);
-    }
     while SERVICE.lock().poll(&mut SOCKET_SET.inner.lock()) {}
 }

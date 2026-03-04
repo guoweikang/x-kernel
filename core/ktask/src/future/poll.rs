@@ -62,10 +62,14 @@ pub fn register_irq_waker(irq: usize, waker: &core::task::Waker) {
     match POLL_IRQ.lock().entry(irq) {
         Entry::Vacant(e) => {
             khal::irq::register_irq_hook(irq_hook);
-            khal::irq::enable(irq, true);
             e.insert(PollSet::new())
         }
         Entry::Occupied(e) => e.into_mut(),
     }
     .register(waker);
+
+    // Always re-enable the IRQ. For level-triggered interrupts, dispatch_irq()
+    // masks unhandled IRQs to prevent interrupt storms. Re-enabling here ensures
+    // the next interrupt can be received after the task has processed data.
+    khal::irq::enable(irq, true);
 }

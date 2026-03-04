@@ -90,7 +90,7 @@ pub fn probe_pci_device<H: VirtIoHal>(
     use virtio_drivers::transport::pci::virtio_device_type;
 
     let dev_kind = virtio_device_type(dev_info).and_then(as_device_kind)?;
-    let transport = PciTransport::new::<H, C>(root, bdf).ok()?;
+    let transport = PciTransport::new::<H>(root, bdf).ok()?;
 
     #[cfg(target_arch = "x86_64")]
     let irq = {

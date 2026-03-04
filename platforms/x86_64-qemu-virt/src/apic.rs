@@ -32,8 +32,7 @@ static IO_APIC: LazyInit<SpinNoIrq<IoApic>> = LazyInit::new();
 
 
 pub fn enable(irq: usize, enabled: bool) {
-    info!("X86_64 enable IRQ: {}, enabled={}", irq, enabled);
-    // 注意：传进来的是 IRQ，我们计算出 Vector 用于越界保护
+    // 传进来的是 IRQ，我们计算出 Vector 用于越界保护
     let vector = 0x20 + irq;
 
     if vector < APIC_TIMER_VECTOR as usize {
@@ -41,16 +40,20 @@ pub fn enable(irq: usize, enabled: bool) {
             let mut io_apic = IO_APIC.lock();
 
             if irq <= io_apic.max_table_entry() as usize {
-                // 在 Enable 阶段动态覆写配置（解决 x86 的 Level/Edge 配置差异）
-                // 我们统一将所有开启的 IO-APIC 引脚配制为 边沿触发、低电平
                 let mut entry = io_apic.table_entry(irq as u8);
-                entry.set_flags(IrqFlags::LOW_ACTIVE); // 注意不要带 LEVEL_TRIGGERED
+                // PCI 中断 (IRQ 10, 11) 使用 Level-triggered + Low-active
+                // 其它 IRQ 使用 Edge-triggered + Low-active
+                if irq == 10 || irq == 11 {
+                    entry.set_flags(IrqFlags::LEVEL_TRIGGERED | IrqFlags::LOW_ACTIVE);
+                } else {
+                    entry.set_flags(IrqFlags::LOW_ACTIVE);
+                }
 
                 if enabled {
-                    io_apic.set_table_entry(irq as u8, entry); // 写入配置
-                    io_apic.enable_irq(irq as u8);             // 解除掩码
+                    io_apic.set_table_entry(irq as u8, entry);
+                    io_apic.enable_irq(irq as u8);
                 } else {
-                    io_apic.disable_irq(irq as u8);            // 加上掩码
+                    io_apic.disable_irq(irq as u8);
                 }
             }
         }
@@ -166,33 +169,32 @@ mod irq_impl {
             IRQ_HANDLER_TABLE.unregister_handler(irq)
         }
 
-        // 外部中断进来的是 CPU Vector，我们需要在这里转换回 IRQ 抛给框架
+        // 外部中断进来的是 CPU Vector，转换回 IRQ 号传给框架
         fn dispatch_irq(vector: usize) -> Option<usize> {
             let irq = if vector >= APIC_TIMER_VECTOR as usize {
-                // 1. Local APIC 内部中断 (Timer=240, Spurious=241, Error=242 等)
-                // 它们不经过 IO-APIC，不需要减去偏移，直接把 Vector 当作逻辑 IRQ 传递
+                // Local APIC 内部中断 (Timer/Spurious/Error)，直接透传
                 vector
             } else if vector >= IO_APIC_VECTOR_BASE {
-                // 2. IO-APIC 外设中断 (如 PCI 网络、块设备)
-                // 它们的 Vector 是我们在初始化时通过 0x20 + irq 映射的，需要还原
+                // IO-APIC 外设中断，还原为 IRQ 号
                 vector - IO_APIC_VECTOR_BASE
             } else {
-                // 3. 异常 (0-31) 不应该进入外设中断派发器
                 return None;
             };
 
-            if irq != APIC_TIMER_VECTOR as usize {
-                // 屏蔽高频的 Timer 日志，只打印外设 IRQ
-                trace!("IRQ {}", irq);
-            }
-
+            trace!("IRQ {}", irq);
             if !IRQ_HANDLER_TABLE.handle(irq) {
-                // 对于异步 poll 机制，因为走的是 IRQ_HOOK，这里如果打印 warning 会刷屏，所以静默或调低日志级别即可
-                warn!("Unhandled IRQ {}", irq);
+                // 对于 level-triggered 的 IO-APIC 中断（如 PCI），如果没有注册
+                // handler，必须在 EOI 前 mask 该 IRQ，否则设备中断线持续拉低，
+                // EOI 后会立即重新触发，造成中断风暴。
+                // 异步 poll 机制通过 irq_hook 唤醒任务，任务处理完数据后会在
+                // register_irq_waker 中重新 enable 该 IRQ。
+                if vector < APIC_TIMER_VECTOR as usize {
+                    super::enable(irq, false);
+                }
             }
 
             unsafe { super::local_apic().end_of_interrupt() };
-            Some(irq) // 向框架传递真实的逻辑 IRQ 号
+            Some(irq)
         }
 
         fn notify_cpu(interrupt_id: usize, target: TargetCpu) {

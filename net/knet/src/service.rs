@@ -67,7 +67,6 @@ impl Service {
     }
 
     pub fn register_rx_waker(&mut self, mask: u32, waker: &Waker) {
-        info!("Service::register_rx_waker mask={:#x}", mask);
         let next = self.iface.poll_at(now(), &SOCKET_SET.inner.lock());
 
         if let Some(t) = next {
@@ -79,17 +78,16 @@ impl Service {
             let mut fut = Box::pin(sleep_until(next));
             let mut cx = Context::from_waker(waker);
 
-            if fut.as_mut().poll(&mut cx).is_ready() {
-                waker.wake_by_ref();
-                return;
-            } else {
+            if fut.as_mut().poll(&mut cx).is_pending() {
                 self.timeout = Some(fut);
             }
+            // If the timer is already expired (Ready), do NOT immediately wake.
+            // Fall through to register device wakers so the task will be woken
+            // by a real device IRQ instead of spinning in a busy loop.
         }
 
         for (i, device) in self.router.devices.iter().enumerate() {
             if mask & (1 << i) != 0 {
-                info!("  -> Registering waker for device {}: {}", i, device.name());
                 device.register_rx_waker(waker);
             }
         }
