@@ -24,6 +24,9 @@ riscv = "0.11"
 [features]
 default = []
 
+# Enable FP/SIMD instructions during boot
+fp-simd = ["kcpu/fp-simd"]
+
 # Enable verbose boot logging
 debug-print = []
 
