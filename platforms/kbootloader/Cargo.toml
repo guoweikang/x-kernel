@@ -11,11 +11,12 @@ description = "Position-independent bootloader for x-kernel (multi-arch)"
 
 [dependencies]
 kbuild_config = { workspace = true }
+kplat = { workspace = true }
+page_table = { workspace = true }
 
 # Architecture-specific dependencies
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64-cpu = "9"
-cortex-a = "8"
+kcpu = { workspace = true }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
 riscv = "0.11"
@@ -28,7 +29,6 @@ debug-print = []
 
 [lib]
 name = "kbootloader"
-crate-type = ["staticlib"]
 
 [profile.release]
 opt-level = 2

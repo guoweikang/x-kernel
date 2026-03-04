@@ -29,8 +29,6 @@ SECTIONS
         __init_array_end = .;
     }
 
-    %DWARF%
-
     . = ALIGN(4K);
     _erodata = .;
 
@@ -80,7 +78,7 @@ SECTIONS
         _percpu_load_start = .;
         *(.percpu .percpu.*)
         _percpu_load_end = .;
-        . = _percpu_load_start + ALIGN(64) * %CPU_NUM%;
+        . = _percpu_load_start + ALIGN(64) * 4;
     }
     . = _percpu_end;
 
@@ -107,19 +105,3 @@ SECTIONS
         *(.comment) *(.gnu*) *(.note*) *(.eh_frame*)
     }
 }
-
-SECTIONS {
-    linkme_IRQ : { KEEP(*(linkme_IRQ)) }
-    linkm2_IRQ : { KEEP(*(linkm2_IRQ)) }
-    linkme_PAGE_FAULT : { KEEP(*(linkme_PAGE_FAULT)) }
-    linkm2_PAGE_FAULT : { KEEP(*(linkm2_PAGE_FAULT)) }
-    scope_local : { KEEP(*(scope_local)) }
-
-    /* Unittest section */
-    .unittest : ALIGN(8) {
-        __unittest_start = .;
-        KEEP(*(.unittest .unittest.*))
-        __unittest_end = .;
-    }
-}
-INSERT AFTER .tbss;
