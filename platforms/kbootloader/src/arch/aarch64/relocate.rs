@@ -76,8 +76,7 @@ pub unsafe fn apply_relocations() {
         if ty == R_AARCH64_RELATIVE {
             // target_phys = r_offset + load_offset
             // *target_phys = r_addend + load_offset
-            let target =
-                ((reloc.r_offset as isize) + load_offset) as *mut usize;
+            let target = ((reloc.r_offset as isize) + load_offset) as *mut usize;
             unsafe {
                 *target = ((reloc.r_addend as isize) + load_offset) as usize;
             }

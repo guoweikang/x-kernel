@@ -9,9 +9,9 @@ mod mmu;
 mod relocate;
 
 pub use entry::_start;
+use kbuild_config::PHYS_VIRT_OFFSET;
 
 use crate::bootinfo::{BootInfo, BootProtocol};
-use kbuild_config::PHYS_VIRT_OFFSET;
 
 /// Static boot info populated before entering kernel.
 static mut BOOT_INFO: BootInfo = BootInfo::new(BootProtocol::DeviceTree);

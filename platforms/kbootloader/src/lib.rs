@@ -15,5 +15,4 @@ mod arch;
 
 #[cfg(target_arch = "aarch64")]
 pub use arch::_start;
-
 pub use bootinfo::BootInfo;

@@ -65,6 +65,9 @@ jobs:
             cp ./platforms/x86_64-qemu-virt/defconfig .config
           fi
 
+      - name: Install xconf
+        run: cargo install --path xtask/xconfig --locked
+
       - name: Clippy
         run: |
           make clippy

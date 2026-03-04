@@ -5,6 +5,11 @@
 kfeat_prefix := kfeat/
 kfeat :=
 
+# Wire user-specified FEATURES into APP_FEATURES so that e.g. FEATURES=kbootloader works
+ifneq ($(FEATURES),)
+  APP_FEATURES += $(FEATURES)
+endif
+
 ifeq ($(filter $(LOG),off error warn info debug trace),)
   $(error "LOG" must be one of "off", "error", "warn", "info", "debug", "trace")
 endif

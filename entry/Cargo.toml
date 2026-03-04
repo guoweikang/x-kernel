@@ -52,6 +52,9 @@ aarch64_qemu_virt = [
     "dep:aarch64-qemu-virt",
 ]
 
+# Enable position-independent bootloader for aarch64-qemu-virt
+kbootloader = ["aarch64-qemu-virt?/kbootloader"]
+
 x86_64_qemu_virt = ["kernel", "qemu", "dep:x86_64-qemu-virt"]
 
 riscv64_qemu_virt = ["kernel", "qemu", "dep:riscv64-qemu-virt"]
