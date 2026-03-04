@@ -143,4 +143,5 @@ unittest = { path = "util/unittest" }
 kbuild_config = { path = "util/kbuild_config" }
 
 kconfig-gen = { path = "xtask/kconfig-gen" }
-smoltcp = { version = "0.12.0",package = "x-smoltcp", default-features = false }
+smoltcp = { version = "0.12.0", package = "x-smoltcp", default-features = false }
+virtio-drivers = { version = "0.7.4", default-features = false }

@@ -37,7 +37,7 @@ unsafe impl Hal for MockHal {
     }
 
     unsafe fn share(buffer: NonNull<[u8]>, _direction: BufferDirection) -> PhysAddr {
-        buffer.as_ptr() as *mut u8 as usize
+        buffer.as_ptr() as *mut u8 as PhysAddr
     }
 
     unsafe fn unshare(_paddr: PhysAddr, _buffer: NonNull<[u8]>, _direction: BufferDirection) {}
