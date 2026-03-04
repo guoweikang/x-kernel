@@ -189,10 +189,8 @@ impl BootInfo {
         }
 
         unsafe {
-            let slice = core::slice::from_raw_parts(
-                self.cmdline_addr as *const u8,
-                self.cmdline_len,
-            );
+            let slice =
+                core::slice::from_raw_parts(self.cmdline_addr as *const u8, self.cmdline_len);
             core::str::from_utf8(slice).ok()
         }
     }
@@ -247,12 +245,24 @@ impl fmt::Debug for BootInfo {
             .field("magic", &format_args!("{:#x}", self.magic))
             .field("version", &self.version)
             .field("protocol", &self.protocol)
-            .field("kernel_load_paddr", &format_args!("{:#x}", self.kernel_load_paddr))
-            .field("phys_virt_offset", &format_args!("{:#x}", self.phys_virt_offset))
+            .field(
+                "kernel_load_paddr",
+                &format_args!("{:#x}", self.kernel_load_paddr),
+            )
+            .field(
+                "phys_virt_offset",
+                &format_args!("{:#x}", self.phys_virt_offset),
+            )
             .field("dtb_addr", &format_args!("{:#x}", self.dtb_addr))
             .field("rsdp_addr", &format_args!("{:#x}", self.rsdp_addr))
-            .field("ramdisk", &format_args!("{:#x}..{:#x}",
-                self.ramdisk_addr, self.ramdisk_addr + self.ramdisk_size))
+            .field(
+                "ramdisk",
+                &format_args!(
+                    "{:#x}..{:#x}",
+                    self.ramdisk_addr,
+                    self.ramdisk_addr + self.ramdisk_size
+                ),
+            )
             .field("cpu_id", &self.cpu_id)
             .field("cpu_count", &self.cpu_count)
             .finish()
@@ -268,7 +278,7 @@ impl fmt::Debug for BootInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BootProtocol {
     /// Unknown/unspecified protocol.
-    Unknown = 0,
+    Unknown    = 0,
 
     /// Multiboot v1 (used by GRUB legacy).
     Multiboot1 = 1,
@@ -277,22 +287,22 @@ pub enum BootProtocol {
     Multiboot2 = 2,
 
     /// UEFI Boot Services (x86_64, aarch64).
-    Uefi = 3,
+    Uefi       = 3,
 
     /// Device Tree (ARM, RISC-V, LoongArch).
     DeviceTree = 4,
 
     /// Linux Boot Protocol (x86_64).
-    LinuxBoot = 5,
+    LinuxBoot  = 5,
 
     /// OpenSBI (RISC-V).
-    OpenSBI = 6,
+    OpenSBI    = 6,
 
     /// U-Boot (ARM, RISC-V).
-    UBoot = 7,
+    UBoot      = 7,
 
     /// BIOS (legacy x86).
-    Bios = 8,
+    Bios       = 8,
 }
 
 /// Pixel format for framebuffer.
@@ -300,10 +310,10 @@ pub enum BootProtocol {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PixelFormat {
     /// RGB (red, green, blue).
-    Rgb = 0,
+    Rgb       = 0,
 
     /// BGR (blue, green, red).
-    Bgr = 1,
+    Bgr       = 1,
 
     /// Grayscale.
     Grayscale = 2,
@@ -334,7 +344,6 @@ pub struct FrameBufferInfo {
     /// Reserved.
     pub _reserved: u8,
 }
-
 
 // ===== Safety Assertions =====
 
@@ -368,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_bootinfo_layout() {
-        use core::mem::{size_of, align_of};
+        use core::mem::{align_of, size_of};
         // BootInfo 必须是 8 字节对齐
         assert_eq!(align_of::<BootInfo>(), 8);
         // 大小必须是 8 的倍数 (便于 FFI)
@@ -385,6 +394,4 @@ mod tests {
         assert_eq!(info.dtb_addr, 0);
         assert_eq!(info.rsdp_addr, 0);
     }
-
-
 }

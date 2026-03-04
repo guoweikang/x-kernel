@@ -78,6 +78,9 @@ jobs:
             cp ./platforms/x86_64-qemu-virt/defconfig .config
           fi
 
+      - name: Install xconf
+        run: cargo install --path xtask/xconfig --locked
+
       - name: Run kernel unit tests
         run: |
           timeout 120 make UNITTEST=y VSOCK=n run | tee unittest-output.log || true

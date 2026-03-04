@@ -8,8 +8,7 @@ use kplat::memory::{PageAligned, pa};
 use page_table::{PageTableEntry, PagingFlags, aarch64::A64PageEntry as A64PTE};
 
 #[unsafe(link_section = ".data")]
-pub static mut BOOT_PT_L0: PageAligned<[A64PTE; 512]> =
-    PageAligned::new([A64PTE::empty(); 512]);
+pub static mut BOOT_PT_L0: PageAligned<[A64PTE; 512]> = PageAligned::new([A64PTE::empty(); 512]);
 
 #[unsafe(link_section = ".data")]
 static mut BOOT_PT_L1: PageAligned<[A64PTE; 512]> = PageAligned::new([A64PTE::empty(); 512]);
