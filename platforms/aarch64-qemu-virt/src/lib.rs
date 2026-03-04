@@ -8,6 +8,9 @@
 #[macro_use]
 extern crate kplat;
 
+// When kbootloader feature is enabled, the unified kbootloader crate provides
+// `_start`. Otherwise, use the platform-specific boot.rs.
+#[cfg(not(feature = "kbootloader"))]
 mod boot;
 mod init;
 mod mem;
