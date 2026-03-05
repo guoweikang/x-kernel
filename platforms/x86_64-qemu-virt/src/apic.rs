@@ -42,11 +42,11 @@ pub fn enable(irq: usize, enabled: bool) {
             if irq <= io_apic.max_table_entry() as usize {
                 let mut entry = io_apic.table_entry(irq as u8);
                 // PCI 中断 (IRQ 10, 11) 使用 Level-triggered + Low-active
-                // 其它 IRQ 使用 Edge-triggered + Low-active
+                // ISA 中断使用 Edge-triggered + Active-high (默认)
                 if irq == 10 || irq == 11 {
                     entry.set_flags(IrqFlags::LEVEL_TRIGGERED | IrqFlags::LOW_ACTIVE);
                 } else {
-                    entry.set_flags(IrqFlags::LOW_ACTIVE);
+                    // 不设置任何 flag = edge-triggered, active-high
                 }
 
                 if enabled {

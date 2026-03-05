@@ -83,6 +83,7 @@ impl GeneralOptions {
 
     /// Register a waker for receive readiness.
     pub fn register_rx_waker(&self, waker: &Waker) {
+        info!("register_rx_waker called for device_mask={:#x}", self.device_mask());
         SERVICE.lock().register_rx_waker(self.device_mask(), waker);
     }
 

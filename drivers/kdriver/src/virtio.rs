@@ -16,7 +16,7 @@ use crate::{DeviceEnum, drivers::DriverProbe};
 
 cfg_if! {
     if #[cfg(bus = "pci")] {
-        use pci::{PciRoot, DeviceFunction, DeviceFunctionInfo};
+        use pci::{Command, PciRoot, DeviceFunction, DeviceFunctionInfo};
         type VirtIoTransport = virtio::PciTransport;
     } else if #[cfg(bus =  "mmio")] {
         type VirtIoTransport = virtio::MmioTransport;
@@ -161,7 +161,19 @@ impl<D: VirtIoDevMeta> DriverProbe for VirtIoDriver<D> {
             && ty == D::DEVICE_TYPE
         {
             match D::try_new(transport, Some(irq)) {
-                Ok(dev) => return Some(dev),
+                Ok(dev) => {
+                    // For devices that don't actively handle interrupts
+                    // (blk, gpu, input, vsock), disable PCI INTx assertions.
+                    // These devices share a level-triggered IRQ line with
+                    // virtio-net. If their ISR is set (e.g. by initial events
+                    // from QEMU) and never cleared, the shared IRQ line stays
+                    // permanently asserted, causing spurious wakeups on net.
+                    if D::DEVICE_TYPE != DeviceKind::Net {
+                        let (_, cmd) = root.get_status_command(bdf);
+                        root.set_command(bdf, cmd | Command::INTERRUPT_DISABLE);
+                    }
+                    return Some(dev);
+                }
                 Err(e) => {
                     warn!("failed to initialize PCI device at {bdf}({dev_info}): {e:?}");
                     return None;

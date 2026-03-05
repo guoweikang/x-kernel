@@ -70,12 +70,32 @@ pub fn block_on<F: IntoFuture>(f: F) -> F::Output {
         match fut.as_mut().poll(&mut cx) {
             Poll::Pending => {
                 let mut rq = current_run_queue::<NoPreemptIrqSave>();
-                let woke = kwaker.woke.lock();
+                let mut woke = kwaker.woke.lock();
                 if !*woke {
+                    // Enable deferred IRQs now, while local interrupts are
+                    // disabled (SpinNoIrq guard held). The IO-APIC will
+                    // unmask the IRQ, but the CPU won't receive it until
+                    // blocked_resched drops the guard — by which time the
+                    // task is in Blocked state and can be properly woken.
+                    poll::flush_deferred_irq_enables();
                     rq.blocked_resched(woke);
+                    // The wake event set woke=true. Clear it now to avoid
+                    // an unnecessary "immediately woken" cycle.
+                    *kwaker.woke.lock() = false;
+                    let wake_irq = poll::take_last_wake_irq();
+                    if wake_irq != 0 {
+                        log::info!("block_on: woken by IRQ {}", wake_irq);
+                    } else {
+                        log::info!("block_on: woken by timer");
+                    }
+
                 } else {
-                    // Immediately woken
+                    // Discard deferred IRQ enables — they will be
+                    // re-registered on the next poll iteration.
+                    poll::clear_deferred_irq_enables();
+                    *woke = false;
                     drop(woke);
+
                     crate::yield_now();
                 }
             }
