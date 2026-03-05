@@ -78,12 +78,12 @@ impl Service {
             let mut fut = Box::pin(sleep_until(next));
             let mut cx = Context::from_waker(waker);
 
-            if fut.as_mut().poll(&mut cx).is_pending() {
+            if fut.as_mut().poll(&mut cx).is_ready() {
+                waker.wake_by_ref();
+                return;
+            } else {
                 self.timeout = Some(fut);
             }
-            // If the timer is already expired (Ready), do NOT immediately wake.
-            // Fall through to register device wakers so the task will be woken
-            // by a real device IRQ instead of spinning in a busy loop.
         }
 
         for (i, device) in self.router.devices.iter().enumerate() {
