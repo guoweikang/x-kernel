@@ -10,15 +10,16 @@ use cfg_if::cfg_if;
 use mbedtls::{
     cipher::{Authenticated, Cipher, CipherData, Decryption, Encryption, Fresh, Operation, raw},
     error::HiError::PemAllocFailed,
-    hash::Md,
+    hash::{Md, Type},
 };
 use memoffset::offset_of;
 use subtle::ConstantTimeEq;
 use tee_raw_sys::{
-    TEE_ALG_AES_ECB_NOPAD, TEE_ALG_AES_GCM, TEE_ALG_HMAC_SHA256, TEE_ALG_HMAC_SM3, TEE_ALG_SHA256,
-    TEE_ALG_SM3, TEE_ALG_SM4_ECB_NOPAD, TEE_ALG_SM4_GCM, TEE_ERROR_BAD_PARAMETERS,
-    TEE_ERROR_CORRUPT_OBJECT, TEE_ERROR_GENERIC, TEE_ERROR_MAC_INVALID, TEE_ERROR_NOT_SUPPORTED,
-    TEE_ERROR_SECURITY, TEE_ERROR_SHORT_BUFFER, TEE_OperationMode, TEE_UUID,
+    TEE_ALG_AES_ECB_NOPAD, TEE_ALG_AES_GCM, TEE_ALG_HMAC_SHA256, TEE_ALG_HMAC_SM3, TEE_ALG_MD5,
+    TEE_ALG_SHA256, TEE_ALG_SHA512, TEE_ALG_SM3, TEE_ALG_SM4_ECB_NOPAD, TEE_ALG_SM4_GCM,
+    TEE_ERROR_BAD_PARAMETERS, TEE_ERROR_BAD_STATE, TEE_ERROR_CORRUPT_OBJECT, TEE_ERROR_GENERIC,
+    TEE_ERROR_MAC_INVALID, TEE_ERROR_NOT_IMPLEMENTED, TEE_ERROR_NOT_SUPPORTED, TEE_ERROR_SECURITY,
+    TEE_ERROR_SHORT_BUFFER, TEE_OperationMode, TEE_UUID,
 };
 
 use super::utee_defines::{
@@ -27,9 +28,6 @@ use super::utee_defines::{
 use crate::tee::{
     TeeResult,
     common::file_ops::FileVariant,
-    crypto_temp::crypto_hash_temp::{
-        crypto_hash_alloc_ctx, crypto_hash_final, crypto_hash_init, crypto_hash_update,
-    },
     rng_software::crypto_rng_read,
     tee_fs_key_manager::{TEE_FS_KM_FEK_SIZE, tee_fs_fek_crypt},
     tee_ree_fs::{BLOCK_SIZE, TeeFsFdAux, TeeFsHtreeStorageOps},
@@ -306,6 +304,48 @@ impl Debug for TeeFsHtree {
             self.root, self.data
         )
     }
+}
+
+fn tee_alg_to_hash_type(value: TeeAlg) -> Result<Type, u32> {
+    match value {
+        TEE_ALG_MD5 => Ok(Type::Md5),
+        TEE_ALG_SHA256 => Ok(Type::Sha256),
+        TEE_ALG_SHA512 => Ok(Type::Sha512),
+        TEE_ALG_SM3 => Ok(Type::SM3),
+        _ => Err(TEE_ERROR_NOT_IMPLEMENTED),
+    }
+}
+
+fn crypto_hash_alloc_ctx(alg: TeeAlg) -> TeeResult<Md> {
+    let t = tee_alg_to_hash_type(alg)?;
+    let md = Md::new(t).map_err(|_| TEE_ERROR_BAD_STATE)?;
+
+    Ok(md)
+}
+
+fn crypto_hash_init(_md: &mut Md) -> TeeResult {
+    // initialized in Md.new
+    Ok(())
+}
+
+fn crypto_hash_update(md: &mut Md, data: &[u8]) -> TeeResult {
+    tee_debug!(
+        "crypto_hash_update: data length: {:?}, data: {:X?}",
+        data.len(),
+        hex::encode(data)
+    );
+    md.update(data).map_err(|_| TEE_ERROR_BAD_STATE)?;
+    Ok(())
+}
+
+fn crypto_hash_final(md: Md, digest: &mut [u8]) -> TeeResult {
+    tee_debug!(
+        "crypto_hash_final: digest length: {:?}, digest: {:X?}",
+        digest.len(),
+        hex::encode(&digest)
+    );
+    md.finish(digest).map_err(|_| TEE_ERROR_BAD_STATE)?;
+    Ok(())
 }
 
 /// read the data from the storage

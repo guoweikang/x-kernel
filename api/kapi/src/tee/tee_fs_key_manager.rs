@@ -12,6 +12,7 @@ use mbedtls::{
     cipher,
     cipher::raw::{Cipher, CipherId, CipherMode, Operation},
     hash,
+    hash::Type,
 };
 use static_assertions::const_assert;
 use tee_raw_sys::{
@@ -22,7 +23,6 @@ use tee_raw_sys::{
 
 use super::{
     TeeResult,
-    crypto_temp::crypto_hash_temp::tee_alg_to_hmac_type,
     huk_subkey::{HUK_SUBKEY_MAX_LEN, HukSubkeyUsage, huk_subkey_derive},
     otp_stubs::{TeeHwUniqueKey, tee_otp_get_hw_unique_key},
     utee_defines::{TEE_SHA256_HASH_SIZE, TEE_SM3_HASH_SIZE, TeeAlg},
@@ -123,6 +123,19 @@ pub fn crypto_cipher_ecb_nopad(
     .map_err(|_| TEE_ERROR_BAD_PARAMETERS)?;
 
     Ok(())
+}
+
+/// Convert TeeAlg to mbedtls::hash::Type
+/// This is a helper function instead of TryFrom implementation due to Rust's orphan rule
+fn tee_alg_to_hmac_type(value: TeeAlg) -> TeeResult<Type> {
+    match value {
+        TEE_ALG_HMAC_MD5 => Ok(Type::Md5),
+        TEE_ALG_HMAC_SHA1 => Ok(Type::Sha1),
+        TEE_ALG_HMAC_SHA256 => Ok(Type::Sha256),
+        TEE_ALG_HMAC_SHA512 => Ok(Type::Sha512),
+        TEE_ALG_HMAC_SM3 => Ok(Type::SM3),
+        _ => Err(TEE_ERROR_NOT_IMPLEMENTED),
+    }
 }
 
 pub fn do_hmac(out_key: &mut [u8], in_key: &[u8], message: &[u8]) -> TeeResult {
