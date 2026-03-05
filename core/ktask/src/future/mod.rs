@@ -82,12 +82,6 @@ pub fn block_on<F: IntoFuture>(f: F) -> F::Output {
                     // The wake event set woke=true. Clear it now to avoid
                     // an unnecessary "immediately woken" cycle.
                     *kwaker.woke.lock() = false;
-                    let wake_irq = poll::take_last_wake_irq();
-                    if wake_irq != 0 {
-                        log::info!("block_on: woken by IRQ {}", wake_irq);
-                    } else {
-                        log::info!("block_on: woken by timer");
-                    }
 
                 } else {
                     // Discard deferred IRQ enables — they will be

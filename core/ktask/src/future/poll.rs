@@ -20,14 +20,6 @@ use kpoll::{IoEvents, Pollable};
 /// firing during the poll phase and causing a spurious wakeup.
 static PENDING_IRQ_ENABLES: AtomicU32 = AtomicU32::new(0);
 
-/// Tracks the last IRQ that caused a wakeup via irq_hook (diagnostic).
-static LAST_WAKE_IRQ: AtomicU32 = AtomicU32::new(0);
-
-/// Returns and clears the last IRQ that woke via irq_hook (diagnostic).
-pub fn take_last_wake_irq() -> u32 {
-    LAST_WAKE_IRQ.swap(0, Ordering::Relaxed)
-}
-
 /// Enable all IRQs that were deferred by `register_irq_waker`.
 ///
 /// Must be called with local interrupts disabled (e.g. while holding
@@ -97,7 +89,6 @@ pub fn register_irq_waker(irq: usize, waker: &core::task::Waker) {
 
     fn irq_hook(irq: usize) {
         if let Some(s) = POLL_IRQ.lock().get(&irq) {
-            LAST_WAKE_IRQ.store(irq as u32, Ordering::Relaxed);
             s.wake();
         }
     }
