@@ -121,7 +121,7 @@ else ifeq ($(PLAT_NAME), aarch64-bsta1000b)
   include scripts/make/bsta1000b-fada.mk
 endif
 
-ROOTFS_URL = https://github.com/Starry-OS/rootfs/releases/download/20250917
+ROOTFS_URL = https://gitee.com/openkylin/x-kernel-image/releases/download/20260302/
 ROOTFS_IMG = rootfs-$(ARCH).img
 
 endif # end of IS_BUILD
