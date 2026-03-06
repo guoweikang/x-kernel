@@ -187,11 +187,7 @@ impl PagingMetaData for X64PagingMetaData {
 
     #[inline]
     fn flush_tlb(vaddr: Option<VirtAddr>) {
-        if let Some(vaddr) = vaddr {
-            x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(vaddr.as_usize() as u64));
-        } else {
-            x86_64::instructions::tlb::flush_all();
-        }
+        karch::flush_tlb(vaddr);
     }
 }
 

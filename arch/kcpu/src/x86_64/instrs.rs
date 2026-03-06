@@ -4,58 +4,14 @@
 
 //! Wrapper functions for assembly instructions.
 
-use core::arch::asm;
+use memaddr::{MemoryAddr, PhysAddr};
+use x86::controlregs;
 
-use memaddr::{MemoryAddr, PhysAddr, VirtAddr};
-use x86::{controlregs, msr, tlb};
-use x86_64::instructions::interrupts;
-
-/// Allows the current CPU to respond to interrupts.
-#[inline]
-pub fn enable_local() {
-    #[cfg(not(target_os = "none"))]
-    {
-        warn!("enable_local: not implemented");
-    }
-    #[cfg(target_os = "none")]
-    interrupts::enable()
-}
-
-/// Makes the current CPU to ignore interrupts.
-#[inline]
-pub fn disable_local() {
-    #[cfg(not(target_os = "none"))]
-    {
-        warn!("disable_local: not implemented");
-    }
-    #[cfg(target_os = "none")]
-    interrupts::disable()
-}
-
-/// Returns whether the current CPU is allowed to respond to interrupts.
-#[inline]
-pub fn is_enabled() -> bool {
-    interrupts::are_enabled()
-}
-
-/// Relaxes the current CPU and waits for interrupts.
-///
-/// It must be called with interrupts enabled, otherwise it will never return.
-#[inline]
-pub fn await_interrupts() {
-    if cfg!(target_os = "none") {
-        unsafe { asm!("hlt") }
-    } else {
-        core::hint::spin_loop()
-    }
-}
-
-/// Halt the current CPU.
-#[inline]
-pub fn stop_cpu() {
-    disable_local();
-    await_interrupts(); // should never return
-}
+pub use karch::{
+    await_interrupts, flush_tlb, read_thread_pointer, stop_cpu, write_thread_pointer,
+};
+// Re-exported with legacy names for backward compatibility.
+pub use karch::{disable_irq as disable_local, enable_irq as enable_local, irq_enabled as is_enabled};
 
 /// Reads the current page table root register for user space (`CR3`).
 ///
@@ -111,39 +67,6 @@ pub unsafe fn write_kernel_page_table(root_paddr: PhysAddr) {
     unsafe { write_user_page_table(root_paddr) }
 }
 
-/// Flushes the TLB.
-///
-/// If `vaddr` is [`None`], flushes the entire TLB. Otherwise, flushes the TLB
-/// entry that maps the given virtual address.
-#[inline]
-pub fn flush_tlb(vaddr: Option<VirtAddr>) {
-    if let Some(vaddr) = vaddr {
-        unsafe { tlb::flush(vaddr.into()) }
-    } else {
-        unsafe { tlb::flush_all() }
-    }
-}
-
-/// Reads the thread pointer of the current CPU (`FS_BASE`).
-///
-/// It is used to implement TLS (Thread Local Storage).
-#[inline]
-pub fn read_thread_pointer() -> usize {
-    unsafe { msr::rdmsr(msr::IA32_FS_BASE) as usize }
-}
-
-/// Writes the thread pointer of the current CPU (`FS_BASE`).
-///
-/// It is used to implement TLS (Thread Local Storage).
-///
-/// # Safety
-///
-/// This function is unsafe as it changes the CPU states.
-#[inline]
-pub unsafe fn write_thread_pointer(fs_base: usize) {
-    unsafe { msr::wrmsr(msr::IA32_FS_BASE, fs_base as u64) }
-}
-
 #[cfg(feature = "uspace")]
 core::arch::global_asm!(include_str!("copy_user.S"));
 
@@ -191,3 +114,4 @@ pub fn hypercall(nr: u64, a0: u64, a1: u64) -> i64 {
     }
     ret
 }
+

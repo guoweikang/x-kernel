@@ -146,11 +146,7 @@ pub trait SvVirtAddr: memaddr::MemoryAddr + Send + Sync {
 impl SvVirtAddr for VirtAddr {
     #[inline]
     fn flush_tlb(vaddr: Option<Self>) {
-        if let Some(vaddr) = vaddr {
-            riscv::asm::sfence_vma(0, vaddr.as_usize());
-        } else {
-            riscv::asm::sfence_vma_all();
-        }
+        karch::flush_tlb(vaddr);
     }
 }
 

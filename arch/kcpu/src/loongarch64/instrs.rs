@@ -6,41 +6,15 @@
 
 use core::arch::asm;
 
-use loongArch64::register::{crmd, ecfg, eentry, pgdh, pgdl};
-use memaddr::{PhysAddr, VirtAddr};
+use loongArch64::register::{ecfg, eentry, pgdh, pgdl};
+use memaddr::PhysAddr;
 
-/// Allows the current CPU to respond to interrupts.
-#[inline]
-pub fn enable_local() {
-    crmd::set_ie(true)
-}
-
-/// Makes the current CPU to ignore interrupts.
-#[inline]
-pub fn disable_local() {
-    crmd::set_ie(false)
-}
-
-/// Returns whether the current CPU is allowed to respond to interrupts.
-#[inline]
-pub fn is_enabled() -> bool {
-    crmd::read().ie()
-}
-
-/// Relaxes the current CPU and waits for interrupts.
-///
-/// It must be called with interrupts enabled, otherwise it will never return.
-#[inline]
-pub fn await_interrupts() {
-    unsafe { loongArch64::asm::idle() }
-}
-
-/// Halt the current CPU.
-#[inline]
-pub fn stop_cpu() {
-    disable_local();
-    unsafe { loongArch64::asm::idle() }
-}
+pub use karch::{
+    await_interrupts, enable_fp, enable_lsx, flush_tlb, read_thread_pointer, stop_cpu,
+    write_thread_pointer,
+};
+// Re-exported with legacy names for backward compatibility.
+pub use karch::{disable_irq as disable_local, enable_irq as enable_local, irq_enabled as is_enabled};
 
 /// Reads the current page table root register for user space (`PGDL`).
 ///
@@ -82,38 +56,6 @@ pub unsafe fn write_kernel_page_table(root_paddr: PhysAddr) {
     pgdh::set_base(root_paddr.as_usize());
 }
 
-/// Flushes the TLB.
-///
-/// If `vaddr` is [`None`], flushes the entire TLB. Otherwise, flushes the TLB
-/// entry that maps the given virtual address.
-#[inline]
-pub fn flush_tlb(vaddr: Option<VirtAddr>) {
-    unsafe {
-        if let Some(vaddr) = vaddr {
-            // <https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html#_dbar>
-            //
-            // Only after all previous load/store access operations are completely
-            // executed, the DBAR 0 instruction can be executed; and only after the
-            // execution of DBAR 0 is completed, all subsequent load/store access
-            // operations can be executed.
-            //
-            // <https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html#_invtlb>
-            //
-            // formats: invtlb op, asid, addr
-            //
-            // op 0x5: Clear all page table entries with G=0 and ASID equal to the
-            // register specified ASID, and VA equal to the register specified VA.
-            //
-            // When the operation indicated by op does not require an ASID, the
-            // general register rj should be set to r0.
-            asm!("dbar 0; invtlb 0x05, $r0, {reg}", reg = in(reg) vaddr.as_usize());
-        } else {
-            // op 0x0: Clear all page table entries
-            asm!("dbar 0; invtlb 0x00, $r0, $r0");
-        }
-    }
-}
-
 /// Writes the Exception Entry Base Address register (`EENTRY`).
 ///
 /// It also set the Exception Configuration register (`ECFG`) to `VS=0`.
@@ -153,43 +95,6 @@ pub unsafe fn write_pwc(pwcl: u32, pwch: u32) {
     }
 }
 
-/// Reads the thread pointer of the current CPU (`$tp`).
-///
-/// It is used to implement TLS (Thread Local Storage).
-#[inline]
-pub fn read_thread_pointer() -> usize {
-    let tp;
-    unsafe { asm!("move {}, $tp", out(reg) tp) };
-    tp
-}
-
-/// Writes the thread pointer of the current CPU (`$tp`).
-///
-/// It is used to implement TLS (Thread Local Storage).
-///
-/// # Safety
-///
-/// This function is unsafe as it changes the CPU states.
-#[inline]
-pub unsafe fn write_thread_pointer(tp: usize) {
-    unsafe { asm!("move $tp, {}", in(reg) tp) }
-}
-
-/// Enables floating-point instructions by setting `EUEN.FPE`.
-///
-/// - `EUEN`: <https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html#extended-component-unit-enable>
-#[inline]
-pub fn enable_fp() {
-    loongArch64::register::euen::set_fpe(true);
-}
-
-/// Enables LSX extension by setting `EUEN.LSX`.
-///
-/// - `EUEN`: <https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html#extended-component-unit-enable>
-pub fn enable_lsx() {
-    loongArch64::register::euen::set_sxe(true);
-}
-
 #[cfg(feature = "uspace")]
 core::arch::global_asm!(include_asm_macros!(), include_str!("copy_user.S"));
 
@@ -206,3 +111,4 @@ unsafe extern "C" {
     /// while a value > 0 indicates failure.
     pub fn user_copy(dst: *mut u8, src: *const u8, size: usize) -> usize;
 }
+

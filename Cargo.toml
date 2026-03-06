@@ -45,6 +45,7 @@ ksync = { path = "core/ksync" }
 ktask = { path = "core/ktask" }
 watchdog = { path = "io/watchdog" }
 kcpu = { path = "arch/kcpu" }
+karch = { path = "arch/karch" }
 
 # x-kernel Crates
 alloc-engine = { path = "mm/alloc-engine" }
