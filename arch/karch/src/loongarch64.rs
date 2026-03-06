@@ -218,6 +218,10 @@ pub unsafe fn write_trap_vector_base(addr: usize) {
 
 /// Writes the Page Walk Controller registers (`PWCL` and `PWCH`).
 ///
+/// The CSR numbers are inlined as numeric constants:
+/// - `PWCL` = CSR 0x1c (lower-half page walk controller)
+/// - `PWCH` = CSR 0x1d (higher-half page walk controller)
+///
 /// # Safety
 ///
 /// This function is unsafe as it changes the page walk configuration such as
