@@ -1,6 +1,6 @@
 [package]
-name = "kcpu"
-description = "Privileged instruction and structure abstractions for various CPU architectures"
+name = "karch"
+description = "Lightweight architecture-specific low-level operations (TLB flush, cache maintenance, CPU halt, interrupt management, thread pointer access)"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -10,42 +10,24 @@ repository.workspace = true
 
 [features]
 default = []
-fp-simd = []
-tls = []
-uspace = []
-arm-el2 = ["karch/arm-el2"]
+arm-el2 = []
 
 [dependencies]
-backtrace = { workspace = true }
-karch = { workspace = true }
-kplat = { workspace = true }
-linkme = "0.3"
-log = "0.4"
 cfg-if = "1.0"
 memaddr = { workspace = true }
-page_table = { workspace = true }
-percpu = { workspace = true }
-static_assertions = "1.1.0"
-unittest.workspace = true
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-lazyinit = "0.2"
 x86 = "0.52"
 x86_64 = { workspace = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64-cpu = "10.0"
-tock-registers = "0.9"
 
 [target.'cfg(any(target_arch = "riscv32", target_arch = "riscv64"))'.dependencies]
 riscv = "0.14"
 
 [target.'cfg(target_arch = "loongarch64")'.dependencies]
 loongArch64 = "0.2.4"
-page_table = { workspace = true }
-
-[lints.clippy]
-new_without_default = "allow"
 
 [package.metadata.docs.rs]
 all-features = true

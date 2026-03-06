@@ -4,44 +4,14 @@
 
 //! Wrapper functions for assembly instructions.
 
-use memaddr::{PhysAddr, VirtAddr};
-use riscv::{
-    asm,
-    register::{satp, sstatus, stvec},
+use memaddr::PhysAddr;
+use riscv::register::{satp, stvec};
+
+pub use karch::{
+    await_interrupts, flush_tlb, read_thread_pointer, stop_cpu, write_thread_pointer,
 };
-
-/// Allows the current CPU to respond to interrupts.
-#[inline]
-pub fn enable_local() {
-    unsafe { sstatus::set_sie() }
-}
-
-/// Makes the current CPU to ignore interrupts.
-#[inline]
-pub fn disable_local() {
-    unsafe { sstatus::clear_sie() }
-}
-
-/// Returns whether the current CPU is allowed to respond to interrupts.
-#[inline]
-pub fn is_enabled() -> bool {
-    sstatus::read().sie()
-}
-
-/// Relaxes the current CPU and waits for interrupts.
-///
-/// It must be called with interrupts enabled, otherwise it will never return.
-#[inline]
-pub fn await_interrupts() {
-    riscv::asm::wfi()
-}
-
-/// Halt the current CPU.
-#[inline]
-pub fn stop_cpu() {
-    disable_local();
-    riscv::asm::wfi() // should never return
-}
+// Re-exported with legacy names for backward compatibility.
+pub use karch::{disable_irq as disable_local, enable_irq as enable_local, irq_enabled as is_enabled};
 
 /// Reads the current page table root register for user space (`satp`).
 ///
@@ -97,19 +67,6 @@ pub unsafe fn write_kernel_page_table(root_paddr: PhysAddr) {
     unsafe { write_user_page_table(root_paddr) };
 }
 
-/// Flushes the TLB.
-///
-/// If `vaddr` is [`None`], flushes the entire TLB. Otherwise, flushes the TLB
-/// entry that maps the given virtual address.
-#[inline]
-pub fn flush_tlb(vaddr: Option<VirtAddr>) {
-    if let Some(vaddr) = vaddr {
-        asm::sfence_vma(0, vaddr.as_usize())
-    } else {
-        asm::sfence_vma_all();
-    }
-}
-
 /// Writes the Supervisor Trap Vector Base Address register (`stvec`).
 ///
 /// # Safety
@@ -122,28 +79,6 @@ pub unsafe fn write_trap_vector_base(stvec: usize) {
     reg.set_address(stvec);
     reg.set_trap_mode(stvec::TrapMode::Direct);
     unsafe { stvec::write(reg) }
-}
-
-/// Reads the thread pointer of the current CPU (`tp`).
-///
-/// It is used to implement TLS (Thread Local Storage).
-#[inline]
-pub fn read_thread_pointer() -> usize {
-    let tp;
-    unsafe { core::arch::asm!("mv {}, tp", out(reg) tp) };
-    tp
-}
-
-/// Writes the thread pointer of the current CPU (`tp`).
-///
-/// It is used to implement TLS (Thread Local Storage).
-///
-/// # Safety
-///
-/// This function is unsafe as it changes the CPU states.
-#[inline]
-pub unsafe fn write_thread_pointer(tp: usize) {
-    unsafe { core::arch::asm!("mv tp, {}", in(reg) tp) }
 }
 
 #[cfg(feature = "uspace")]
@@ -162,3 +97,4 @@ unsafe extern "C" {
     /// while a value > 0 indicates failure.
     pub fn user_copy(dst: *mut u8, src: *const u8, size: usize) -> usize;
 }
+
