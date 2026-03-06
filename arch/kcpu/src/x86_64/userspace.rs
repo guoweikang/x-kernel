@@ -79,7 +79,7 @@ impl UserContext {
         assert_eq!(self.cs, gdt::UCODE64.0 as _);
         assert_eq!(self.ss, gdt::UDATA.0 as _);
 
-        crate::instrs::disable_local();
+        karch::disable_local_irq();
 
         let kernel_fs_base = read_thread_pointer();
         unsafe { write_thread_pointer(self.fs_base as _) };
@@ -112,7 +112,7 @@ impl UserContext {
             }),
         };
 
-        crate::instrs::enable_local();
+        karch::enable_local_irq();
         ret
     }
 }
