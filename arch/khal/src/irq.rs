@@ -15,6 +15,10 @@ pub use kplat::interrupts::{
     dispatch_irq, enable, reg_handler as register, set_prio, unreg_handler as unregister,
 };
 
+// Platform-provided functions for MSI-X support (x86_64 only).
+#[cfg(target_arch = "x86_64")]
+pub use kplat::interrupts::{alloc_msix_vector, current_apic_id};
+
 static IRQ_HOOK: AtomicUsize = AtomicUsize::new(0);
 
 /// Register a hook function called after an IRQ is dispatched.

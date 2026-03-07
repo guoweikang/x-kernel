@@ -52,11 +52,11 @@ pub use virtio_drivers::{
     transport::{
         Transport,
         mmio::MmioTransport,
-        pci::{PciTransport, bus as pci},
+        pci::{PciTransport, bus as virtio_pci_bus},
     },
 };
 
-use self::pci::{DeviceFunction, DeviceFunctionInfo, PciRoot};
+use self::virtio_pci_bus::{DeviceFunction, DeviceFunctionInfo, PciRoot};
 #[cfg(feature = "socket")]
 pub use self::socket::VirtIoSocketDev;
 
@@ -86,33 +86,69 @@ pub fn probe_pci_device<H: VirtIoHal>(
     root: &mut PciRoot,
     bdf: DeviceFunction,
     dev_info: &DeviceFunctionInfo,
+    config: &mut ::pci::PciConfigAccess,
 ) -> Option<(DeviceKind, PciTransport, usize)> {
     use virtio_drivers::transport::pci::virtio_device_type;
 
     let dev_kind = virtio_device_type(dev_info).and_then(as_device_kind)?;
-    let transport = PciTransport::new::<H>(root, bdf).ok()?;
 
+    // Attempt MSI-X setup before creating PciTransport (x86_64 only).
+    // MSI-X gives each device its own edge-triggered vector, eliminating
+    // shared level-triggered IRQ issues.
     #[cfg(target_arch = "x86_64")]
     let irq = {
-        // 读取 PCI 配置空间偏移 0x3C 处的值 (Interrupt Line)
-        // 注意：根据你的 pci crate 实现，如果原生支持 read8，可以直接调用
-        // 这里假设底层提供 32 位读取能力，0x3C 的最低 8 位即为 Interrupt Line
-        // let config_data = root.read(bdf, 0x3C);
-        // let irq_line = (config_data & 0xFF) as usize;
-        // irq_line // 直接返回 IRQ (例如 10 或是 11)，不要在这里加 CPU Vector 偏移！
+        use khal::irq::{alloc_msix_vector, current_apic_id};
+        use ::pci::msix::{MsixTableEntry, configure_msix_entry, enable_msix, find_msix_capability};
 
-        // 由于 virtio-drivers 封装了 PciRoot 的配置空间读取能力，
-        // 这里暂时硬编码 QEMU i440fx 主板的默认 PCI IRQ 路由 (PIRQ 轮转)。
-        // 注意：这里只返回纯 IRQ 号 (10, 11)，绝对不要加上 CPU Vector 的偏移！
-        match bdf.device {
-                0..=3 => 11,
-                4..=7 => 10,
-            _ => 11,
+        if let Some(cap) = find_msix_capability(root, config, bdf) {
+            // Allocate a CPU vector for this device.
+            if let Some(vector) = alloc_msix_vector() {
+                // Get the BAR that holds the MSI-X table.
+                let bar = root.bar_info(bdf, cap.table_bar).ok().and_then(|info| {
+                    if let ::pci::BarInfo::Memory { address, .. } = info {
+                        Some(address as usize)
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(bar_phys) = bar {
+                    let table_virt =
+                        khal::mem::p2v((bar_phys + cap.table_offset as usize).into());
+                    let table_ptr =
+                        table_virt.as_mut_ptr() as *mut MsixTableEntry;
+
+                    let apic_id = current_apic_id();
+
+                    // Configure MSI-X table entry 0.
+                    unsafe { configure_msix_entry(table_ptr, 0, vector, apic_id) };
+
+                    // Enable MSI-X and disable legacy INTx.
+                    enable_msix(root, config, bdf, &cap);
+
+                    log::info!(
+                        "PCI virtio device at {:?}: MSI-X vector = {:#x}",
+                        bdf,
+                        vector
+                    );
+                    vector as usize
+                } else {
+                    // BAR not mapped; fall back to legacy IRQ.
+                    legacy_irq_for_bdf(config, bdf)
+                }
+            } else {
+                // No vectors left; fall back to legacy IRQ.
+                legacy_irq_for_bdf(config, bdf)
+            }
+        } else {
+            // Device has no MSI-X capability; use legacy INTx.
+            legacy_irq_for_bdf(config, bdf)
         }
     };
 
     #[cfg(not(target_arch = "x86_64"))]
     let irq = {
+        let _ = &config; // not used on non-x86_64 platforms
         #[cfg(target_arch = "loongarch64")]
         const PCI_IRQ_BASE: usize = 0x10;
         #[cfg(target_arch = "aarch64")]
@@ -122,8 +158,18 @@ pub fn probe_pci_device<H: VirtIoHal>(
         PCI_IRQ_BASE + (bdf.device & 3) as usize
     };
 
+    let transport = PciTransport::new::<H>(root, bdf).ok()?;
     log::info!("PCI virtio device at {:?}: IRQ = {}", bdf, irq);
     Some((dev_kind, transport, irq))
+}
+
+/// Reads the PCI Interrupt Line register (config space offset 0x3C) for the
+/// given device and returns it as a legacy IRQ number.
+#[cfg(target_arch = "x86_64")]
+fn legacy_irq_for_bdf(config: &::pci::PciConfigAccess, bdf: DeviceFunction) -> usize {
+    // Offset 0x3C contains the Interrupt Line register in bits 7:0.
+    let word = config.read_word(bdf, 0x3C);
+    (word & 0xFF) as usize
 }
 
 const fn as_device_kind(t: VirtIoDevType) -> Option<DeviceKind> {

@@ -4,15 +4,18 @@
 
 //! Local APIC and IO APIC setup for x86_64-qemu-virt.
 
-use core::mem::MaybeUninit;
+use core::{
+    mem::MaybeUninit,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
 use kplat::memory::{PhysAddr, p2v, pa};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use x2apic::{
     ioapic::IoApic,
-    lapic::{LocalApic, LocalApicBuilder, xapic_base},
     ioapic::IrqFlags,
+    lapic::{LocalApic, LocalApicBuilder, xapic_base},
 };
 use x86_64::instructions::port::Port;
 
@@ -22,17 +25,54 @@ pub(super) mod vectors {
     pub const APIC_TIMER_VECTOR: u8 = 0xf0;
     pub const APIC_SPURIOUS_VECTOR: u8 = 0xf1;
     pub const APIC_ERROR_VECTOR: u8 = 0xf2;
+    /// First CPU vector reserved for MSI-X. Vectors 0x40–0xEF are available
+    /// for MSI-X (above the IO-APIC range 0x20–0x3F, below APIC_TIMER_VECTOR).
+    pub const MSIX_VECTOR_BASE: u8 = 0x40;
 }
 
 const IO_APIC_BASE: PhysAddr = pa!(0xFEC0_0000);
 static mut LOCAL_APIC: MaybeUninit<LocalApic> = MaybeUninit::uninit();
 static mut IS_X2APIC: bool = false;
 static IO_APIC: LazyInit<SpinNoIrq<IoApic>> = LazyInit::new();
-/// Enables or disables the IO APIC line for the given irq number.
 
+/// Counter used to dynamically allocate MSI-X CPU vectors.
+/// Starts at MSIX_VECTOR_BASE and increments on each allocation.
+static MSIX_VECTOR_COUNTER: AtomicU8 = AtomicU8::new(MSIX_VECTOR_BASE);
 
+/// Allocates the next available MSI-X CPU vector.
+///
+/// Returns `None` when all vectors in the range
+/// `[MSIX_VECTOR_BASE, APIC_TIMER_VECTOR)` are exhausted.
+#[unsafe(export_name = "__kplat_alloc_msix_vector")]
+pub fn alloc_msix_vector() -> Option<u8> {
+    let v = MSIX_VECTOR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    if v < APIC_TIMER_VECTOR {
+        Some(v)
+    } else {
+        // Undo the over-increment so the counter doesn't wrap.
+        MSIX_VECTOR_COUNTER.store(APIC_TIMER_VECTOR, Ordering::Relaxed);
+        None
+    }
+}
+
+/// Returns the APIC ID of the current logical CPU.
+#[unsafe(export_name = "__kplat_current_apic_id")]
+pub fn current_apic_id() -> u8 {
+    raw_cpuid::CpuId::new()
+        .get_feature_info()
+        .map_or(0, |f| f.initial_local_apic_id())
+}
+
+/// Enables or disables the IO APIC line for the given IRQ number.
+///
+/// MSI-X vectors (>= MSIX_VECTOR_BASE) bypass the IO-APIC entirely and are
+/// delivered directly by the Local APIC, so they are ignored here.
 pub fn enable(irq: usize, enabled: bool) {
-    // 传进来的是 IRQ，我们计算出 Vector 用于越界保护
+    // MSI-X vectors are not routed through the IO-APIC.
+    if irq >= MSIX_VECTOR_BASE as usize {
+        return;
+    }
+
     let vector = 0x20 + irq;
 
     if vector < APIC_TIMER_VECTOR as usize {
@@ -40,14 +80,7 @@ pub fn enable(irq: usize, enabled: bool) {
             let mut io_apic = IO_APIC.lock();
 
             if irq <= io_apic.max_table_entry() as usize {
-                let mut entry = io_apic.table_entry(irq as u8);
-                // PCI 中断 (IRQ 10, 11) 使用 Level-triggered + Low-active
-                // ISA 中断使用 Edge-triggered + Active-high (默认)
-                if irq == 10 || irq == 11 {
-                    entry.set_flags(IrqFlags::LEVEL_TRIGGERED | IrqFlags::LOW_ACTIVE);
-                } else {
-                    // 不设置任何 flag = edge-triggered, active-high
-                }
+                let entry = io_apic.table_entry(irq as u8);
 
                 if enabled {
                     io_apic.set_table_entry(irq as u8, entry);
@@ -143,7 +176,7 @@ mod irq_impl {
     use super::*;
 
     const MAX_IRQ_COUNT: usize = 256;
-    const IO_APIC_VECTOR_BASE: usize = 0x20; // 收敛到底层 外部只看到IRQ编号，不暴露CPU Vector细节
+    const IO_APIC_VECTOR_BASE: usize = 0x20;
 
     static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
     struct IntrManagerImpl;
@@ -174,6 +207,14 @@ mod irq_impl {
             let irq = if vector >= APIC_TIMER_VECTOR as usize {
                 // Local APIC 内部中断 (Timer/Spurious/Error)，直接透传
                 vector
+            } else if vector >= MSIX_VECTOR_BASE as usize {
+                // MSI-X vector range: the vector IS the IRQ identifier.
+                // MSI-X is edge-triggered, so no masking is needed on dispatch.
+                let irq = vector;
+                trace!("MSI-X IRQ {}", irq);
+                IRQ_HANDLER_TABLE.handle(irq);
+                unsafe { super::local_apic().end_of_interrupt() };
+                return Some(irq);
             } else if vector >= IO_APIC_VECTOR_BASE {
                 // IO-APIC 外设中断，还原为 IRQ 号
                 vector - IO_APIC_VECTOR_BASE
@@ -182,16 +223,7 @@ mod irq_impl {
             };
 
             trace!("IRQ {}", irq);
-            if !IRQ_HANDLER_TABLE.handle(irq) {
-                // 对于 level-triggered 的 IO-APIC 中断（如 PCI），如果没有注册
-                // handler，必须在 EOI 前 mask 该 IRQ，否则设备中断线持续拉低，
-                // EOI 后会立即重新触发，造成中断风暴。
-                // 异步 poll 机制通过 irq_hook 唤醒任务，任务处理完数据后会在
-                // register_irq_waker 中重新 enable 该 IRQ。
-                if vector < APIC_TIMER_VECTOR as usize {
-                    super::enable(irq, false);
-                }
-            }
+            IRQ_HANDLER_TABLE.handle(irq);
 
             unsafe { super::local_apic().end_of_interrupt() };
             Some(irq)
@@ -224,3 +256,4 @@ mod irq_impl {
         }
     }
 }
+
