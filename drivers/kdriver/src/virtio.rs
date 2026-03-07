@@ -16,7 +16,7 @@ use crate::{DeviceEnum, drivers::DriverProbe};
 
 cfg_if! {
     if #[cfg(bus = "pci")] {
-        use pci::{PciRoot, DeviceFunction, DeviceFunctionInfo};
+        use pci::{Cam, PciConfigAccess, PciRoot, DeviceFunction, DeviceFunctionInfo};
         type VirtIoTransport = virtio::PciTransport;
     } else if #[cfg(bus =  "mmio")] {
         type VirtIoTransport = virtio::MmioTransport;
@@ -156,12 +156,23 @@ impl<D: VirtIoDevMeta> DriverProbe for VirtIoDriver<D> {
             _ => return None,
         }
 
+        // Create a PciConfigAccess for reading/writing arbitrary config space
+        // registers (e.g. for MSI-X capability setup).
+        #[cfg(feature = "pci-mmio")]
+        let cam = Cam::MmioCam;
+        #[cfg(not(feature = "pci-mmio"))]
+        let cam = Cam::Ecam;
+        let base_vaddr = khal::mem::p2v((kbuild_config::PCI_ECAM_BASE).into());
+        let mut config = unsafe { PciConfigAccess::new(base_vaddr.as_mut_ptr(), cam) };
+
         if let Some((ty, transport, irq)) =
-            virtio::probe_pci_device::<VirtIoHalImpl>(root, bdf, dev_info)
+            virtio::probe_pci_device::<VirtIoHalImpl>(root, bdf, dev_info, &mut config)
             && ty == D::DEVICE_TYPE
         {
             match D::try_new(transport, Some(irq)) {
-                Ok(dev) => return Some(dev),
+                Ok(dev) => {
+                    return Some(dev);
+                }
                 Err(e) => {
                     warn!("failed to initialize PCI device at {bdf}({dev_info}): {e:?}");
                     return None;
