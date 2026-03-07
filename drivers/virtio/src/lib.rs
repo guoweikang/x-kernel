@@ -56,9 +56,9 @@ pub use virtio_drivers::{
     },
 };
 
-use self::virtio_pci_bus::{DeviceFunction, DeviceFunctionInfo, PciRoot};
 #[cfg(feature = "socket")]
 pub use self::socket::VirtIoSocketDev;
+use self::virtio_pci_bus::{DeviceFunction, DeviceFunctionInfo, PciRoot};
 
 /// Try to probe a VirtIO MMIO device from the given memory region.
 ///

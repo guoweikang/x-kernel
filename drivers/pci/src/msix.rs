@@ -84,9 +84,7 @@ pub fn find_msix_capability(
     config: &PciConfigAccess,
     bdf: DeviceFunction,
 ) -> Option<MsixCapability> {
-    let cap_info = root
-        .capabilities(bdf)
-        .find(|cap| cap.id == MSIX_CAP_ID)?;
+    let cap_info = root.capabilities(bdf).find(|cap| cap.id == MSIX_CAP_ID)?;
 
     let cap_offset = cap_info.offset as u16;
 

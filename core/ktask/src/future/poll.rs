@@ -74,4 +74,3 @@ pub fn register_irq_waker(irq: usize, waker: &core::task::Waker) {
     // during the poll phase.
     khal::irq::enable(irq, true);
 }
-

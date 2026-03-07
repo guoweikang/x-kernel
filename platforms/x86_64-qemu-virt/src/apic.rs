@@ -13,8 +13,7 @@ use kplat::memory::{PhysAddr, p2v, pa};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use x2apic::{
-    ioapic::IoApic,
-    ioapic::IrqFlags,
+    ioapic::{IoApic, IrqFlags},
     lapic::{LocalApic, LocalApicBuilder, xapic_base},
 };
 use x86_64::instructions::port::Port;
@@ -152,12 +151,15 @@ pub fn init_primary() {
 
     let mut io_apic = unsafe { IoApic::new(p2v(IO_APIC_BASE).as_usize() as u64) };
 
-     unsafe {
-        use x2apic::ioapic::IrqMode;
-        use x2apic::ioapic::RedirectionTableEntry;
+    unsafe {
+        use x2apic::ioapic::{IrqMode, RedirectionTableEntry};
 
         let max_entry = io_apic.max_table_entry();
-        info!("  IO-APIC supports {} IRQ inputs (0-{})", max_entry + 1, max_entry);
+        info!(
+            "  IO-APIC supports {} IRQ inputs (0-{})",
+            max_entry + 1,
+            max_entry
+        );
 
         // 为所有 IRQ line 创建默认 RTE (masked 状态)。
         // ISA IRQ 0-9 使用 edge-triggered, high-active（PC/AT 惯例）。
@@ -171,9 +173,8 @@ pub fn init_primary() {
             entry.set_mode(IrqMode::Fixed);
             if irq >= 10 {
                 // PCI INTx: level-triggered, low-active, masked
-                entry.set_flags(
-                    IrqFlags::LEVEL_TRIGGERED | IrqFlags::LOW_ACTIVE | IrqFlags::MASKED,
-                );
+                entry
+                    .set_flags(IrqFlags::LEVEL_TRIGGERED | IrqFlags::LOW_ACTIVE | IrqFlags::MASKED);
             } else {
                 // ISA: edge-triggered, high-active, masked
                 entry.set_flags(IrqFlags::MASKED);
@@ -192,6 +193,7 @@ pub fn init_secondary() {
 }
 mod irq_impl {
     use kplat::interrupts::{Handler, HandlerTable, IntrManager, TargetCpu};
+
     use super::*;
 
     const MAX_IRQ_COUNT: usize = 256;
@@ -199,7 +201,6 @@ mod irq_impl {
 
     static IRQ_HANDLER_TABLE: HandlerTable<MAX_IRQ_COUNT> = HandlerTable::new();
     struct IntrManagerImpl;
-
 
     #[impl_dev_interface]
     impl IntrManager for IntrManagerImpl {
@@ -284,4 +285,3 @@ mod irq_impl {
         }
     }
 }
-

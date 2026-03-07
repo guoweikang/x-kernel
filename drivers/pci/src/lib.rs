@@ -82,12 +82,7 @@ impl PciConfigAccess {
     /// Writes a 32-bit word to PCI configuration space.
     ///
     /// `register_offset` is the byte offset; the two LSBs are ignored.
-    pub fn write_word(
-        &mut self,
-        device_function: DeviceFunction,
-        register_offset: u16,
-        data: u32,
-    ) {
+    pub fn write_word(&mut self, device_function: DeviceFunction, register_offset: u16, data: u32) {
         let address = self.cam_offset(device_function, register_offset);
         // SAFETY: Same as read_word.
         unsafe {
