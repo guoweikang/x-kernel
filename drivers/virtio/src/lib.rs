@@ -97,9 +97,14 @@ pub fn probe_pci_device<H: VirtIoHal>(
     // shared level-triggered IRQ issues.
     #[cfg(target_arch = "x86_64")]
     let irq = {
+        #[allow(unused_imports)]
         use khal::irq::{alloc_msix_vector, current_apic_id};
+        #[allow(unused_imports)]
         use ::pci::msix::{MsixTableEntry, configure_msix_entry, enable_msix, find_msix_capability};
 
+        // TODO: after virtio-drivers supports multiple MSI-X vectors, we should allocate and
+        // configure
+        /*
         if let Some(cap) = find_msix_capability(root, config, bdf) {
             // Allocate a CPU vector for this device.
             if let Some(vector) = alloc_msix_vector() {
@@ -143,6 +148,8 @@ pub fn probe_pci_device<H: VirtIoHal>(
             // Device has no MSI-X capability; use legacy INTx.
             legacy_irq_for_bdf(config, bdf)
         }
+        */
+        legacy_irq_for_bdf(config, bdf)
     };
 
     #[cfg(not(target_arch = "x86_64"))]
