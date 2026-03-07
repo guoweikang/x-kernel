@@ -159,11 +159,11 @@ impl<D: VirtIoDevMeta> DriverProbe for VirtIoDriver<D> {
         // Create a PciConfigAccess for reading/writing arbitrary config space
         // registers (e.g. for MSI-X capability setup).
         #[cfg(feature = "pci-mmio")]
-        let cam = pci::Cam::MmioCam;
+        let cam = Cam::MmioCam;
         #[cfg(not(feature = "pci-mmio"))]
-        let cam = pci::Cam::Ecam;
+        let cam = Cam::Ecam;
         let base_vaddr = khal::mem::p2v((kbuild_config::PCI_ECAM_BASE).into());
-        let mut config = unsafe { pci::PciConfigAccess::new(base_vaddr.as_mut_ptr(), cam) };
+        let mut config = unsafe { PciConfigAccess::new(base_vaddr.as_mut_ptr(), cam) };
 
         if let Some((ty, transport, irq)) =
             virtio::probe_pci_device::<VirtIoHalImpl>(root, bdf, dev_info, &mut config)
