@@ -43,6 +43,7 @@ impl ConsoleIf for ConsoleImpl {
     }
 
     fn interrupt_id() -> Option<usize> {
-        None
+        // COM1 (0x3F8) uses IRQ 4 on x86
+        Some(4)
     }
 }
