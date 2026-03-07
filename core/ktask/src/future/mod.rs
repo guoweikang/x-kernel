@@ -72,10 +72,21 @@ pub fn block_on<F: IntoFuture>(f: F) -> F::Output {
                 let mut rq = current_run_queue::<NoPreemptIrqSave>();
                 let woke = kwaker.woke.lock();
                 if !*woke {
+                    // blocked_resched() will set *woke = false and drop
+                    // the guard internally before rescheduling. When this
+                    // task is woken, woke will be set to true by the waker
+                    // and we'll re-enter the loop to poll again.
                     rq.blocked_resched(woke);
                 } else {
-                    // Immediately woken
+                    // The waker fired between poll() returning Pending and
+                    // us acquiring the lock. Clear the flag and yield so
+                    // we re-poll promptly.
+                    // We cannot just drop(woke) without clearing, otherwise
+                    // the next iteration will see woke=true and never block.
                     drop(woke);
+                    // Clear woke under a fresh lock acquisition to avoid
+                    // holding it across yield_now().
+                    *kwaker.woke.lock() = false;
                     crate::yield_now();
                 }
             }

@@ -62,10 +62,16 @@ pub fn register_irq_waker(irq: usize, waker: &core::task::Waker) {
     match POLL_IRQ.lock().entry(irq) {
         Entry::Vacant(e) => {
             khal::irq::register_irq_hook(irq_hook);
-            khal::irq::enable(irq, true);
             e.insert(PollSet::new())
         }
         Entry::Occupied(e) => e.into_mut(),
     }
     .register(waker);
+
+    // With MSI-X (edge-triggered), enabling the IRQ here is safe: an
+    // edge-triggered interrupt fires once per assertion and does not re-fire
+    // while the line is held. There is no risk of a spurious wakeup loop
+    // during the poll phase.
+    khal::irq::enable(irq, true);
 }
+
