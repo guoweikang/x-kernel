@@ -105,10 +105,9 @@ pub fn probe_pci_device<H: VirtIoHal>(
             if let Some(vector) = alloc_msix_vector() {
                 // Get the BAR that holds the MSI-X table.
                 let bar = root.bar_info(bdf, cap.table_bar).ok().and_then(|info| {
-                    if let ::pci::BarInfo::Memory { address, .. } = info {
-                        Some(address as usize)
-                    } else {
-                        None
+                    match info {
+                        ::pci::BarInfo::Memory { address, .. } => Some(address as usize),
+                        _ => None,
                     }
                 });
 

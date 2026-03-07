@@ -149,6 +149,15 @@ pub fn enable_msix(
 /// * `cpu_vector` - CPU interrupt vector number to deliver (e.g. 0x40..0xEF).
 /// * `dest_apic_id` - APIC ID of the target CPU (usually the boot CPU, 0).
 ///
+/// # Notes
+///
+/// This function uses the xAPIC physical addressing format where the 8-bit
+/// Destination ID is placed in bits 19:12 of the MSI address. For x2APIC
+/// mode the destination ID is 32 bits and the address format differs, but
+/// on QEMU with up to 8 CPUs the APIC IDs fit in 8 bits and xAPIC-format
+/// MSI addresses work correctly even when x2APIC mode is active (the
+/// hardware accepts the xAPIC MSI format for dest IDs <= 0xFF).
+///
 /// # Safety
 ///
 /// `table_base` must be a valid, mapped MMIO pointer to the MSI-X table. The

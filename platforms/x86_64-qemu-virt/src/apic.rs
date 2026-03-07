@@ -45,13 +45,23 @@ static MSIX_VECTOR_COUNTER: AtomicU8 = AtomicU8::new(MSIX_VECTOR_BASE);
 /// `[MSIX_VECTOR_BASE, APIC_TIMER_VECTOR)` are exhausted.
 #[unsafe(export_name = "__kplat_alloc_msix_vector")]
 pub fn alloc_msix_vector() -> Option<u8> {
-    let v = MSIX_VECTOR_COUNTER.fetch_add(1, Ordering::Relaxed);
-    if v < APIC_TIMER_VECTOR {
-        Some(v)
-    } else {
-        // Undo the over-increment so the counter doesn't wrap.
-        MSIX_VECTOR_COUNTER.store(APIC_TIMER_VECTOR, Ordering::Relaxed);
-        None
+    // Use a compare-exchange loop to atomically check-and-increment,
+    // avoiding any risk of the counter wrapping past APIC_TIMER_VECTOR when
+    // called concurrently (e.g. from multiple CPUs during boot).
+    loop {
+        let current = MSIX_VECTOR_COUNTER.load(Ordering::Relaxed);
+        if current >= APIC_TIMER_VECTOR {
+            return None;
+        }
+        match MSIX_VECTOR_COUNTER.compare_exchange(
+            current,
+            current + 1,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return Some(current),
+            Err(_) => continue,
+        }
     }
 }
 
