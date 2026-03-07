@@ -13,10 +13,11 @@ default = []
 fp-simd = []
 tls = []
 uspace = []
-arm-el2 = []
+arm-el2 = ["karch/arm-el2"]
 
 [dependencies]
 backtrace = { workspace = true }
+karch = { workspace = true }
 kplat = { workspace = true }
 linkme = "0.3"
 log = "0.4"

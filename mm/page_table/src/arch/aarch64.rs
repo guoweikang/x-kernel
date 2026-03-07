@@ -2,7 +2,7 @@
 // Copyright 2025 KylinSoft Co., Ltd. <https://www.kylinos.cn/>
 // See LICENSES for license details.
 
-use core::{arch::asm, fmt};
+use core::fmt;
 
 use memaddr::{PhysAddr, VirtAddr};
 
@@ -226,14 +226,7 @@ impl PagingMetaData for A64PagingMetaData {
 
     #[inline]
     fn flush_tlb(vaddr: Option<VirtAddr>) {
-        unsafe {
-            if let Some(vaddr) = vaddr {
-                const VA_MASK: usize = (1 << 44) - 1;
-                asm!("dsb ishst; tlbi vaae1is, {}; dsb ish; isb", in(reg) ((vaddr.as_usize() >> 12) & VA_MASK))
-            } else {
-                asm!("dsb ishst; tlbi vmalle1is; dsb ish; isb")
-            }
-        }
+        karch::flush_tlb(vaddr);
     }
 }
 
