@@ -2,296 +2,182 @@
 // Copyright 2025 KylinSoft Co., Ltd. <https://www.kylinos.cn/>
 // See LICENSES for license details.
 
-use core::ops::{Deref, DerefMut};
+//! Early boot page table setup and MMU initialisation for AArch64.
+//!
+//! All code in this module that runs before the MMU is enabled lives in
+//! `.idmap.text` and uses only PC-relative addressing to obtain physical
+//! addresses of data.
 
-use aarch64_cpu::registers::*;
-use aarch64_cpu_ext::structures::tte::{AccessPermission, Shareability, TTE4K48};
-use log::debug;
-use page_table_generic::{
-    Access, MapConfig, PTEGeneric, PageTableRef, PhysAddr, TableGeneric, VirtAddr,
+use aarch64_cpu::{asm::barrier, registers::*};
+use memaddr::PhysAddr;
+use page_table::{
+    PageTableEntry,
+    PagingFlags,
+    aarch64::{A64PageEntry, Arm64MemAttr},
 };
 
-use super::layout::KLINER_OFFSET;
-use pie_boot_loader_aarch64::CacheKind;
-use spin::Mutex;
+/// A page-aligned wrapper used to place page table arrays in the correct
+/// linker section with the required 4 KiB alignment.
+#[repr(C, align(4096))]
+struct PageAligned<T>(T);
 
-use crate::{
-    arch::el::flush_tlb,
-    common::{
-        self,
-        mem::{AccessKind, MapRangeConfig, regions_to_map},
-    },
-    mem::PageTable,
-};
-
-struct Allocator;
-
-impl Access for Allocator {
-    unsafe fn alloc(
-        &mut self,
-        layout: core::alloc::Layout,
-    ) -> Option<page_table_generic::PhysAddr> {
-        let ptr = unsafe { alloc::alloc::alloc(layout) };
-        if ptr.is_null() {
-            None
-        } else {
-            let phys = ptr as usize - KLINER_OFFSET;
-            Some(phys.into())
-        }
-    }
-
-    unsafe fn dealloc(&mut self, ptr: page_table_generic::PhysAddr, layout: core::alloc::Layout) {
-        let ptr = (ptr.raw() + KLINER_OFFSET) as *mut u8;
-        unsafe { alloc::alloc::dealloc(ptr, layout) };
-    }
-
-    fn phys_to_mut(&self, phys: page_table_generic::PhysAddr) -> *mut u8 {
-        (phys.raw() + KLINER_OFFSET) as *mut u8
+impl<T: Copy> PageAligned<T> {
+    const fn new(val: T) -> Self {
+        Self(val)
     }
 }
 
-#[unsafe(link_section = ".data")]
-pub(crate) static KERNAL_TABLE: Mutex<Option<PageTableRef<'static, TableImpl>>> = Mutex::new(None);
-
-impl From<AccessKind> for AccessPermission {
-    fn from(value: AccessKind) -> Self {
-        match value {
-            AccessKind::Read => AccessPermission::ReadOnly,
-            AccessKind::ReadWrite => AccessPermission::ReadWrite,
-            AccessKind::ReadExecute => AccessPermission::ReadOnly,
-            AccessKind::ReadWriteExecute => AccessPermission::ReadWrite,
-        }
+impl<T, const N: usize> core::ops::Index<usize> for PageAligned<[T; N]> {
+    type Output = T;
+    fn index(&self, idx: usize) -> &T {
+        &self.0[idx]
     }
 }
 
-impl From<common::mem::CacheKind> for CacheKind {
-    fn from(value: common::mem::CacheKind) -> Self {
-        match value {
-            common::mem::CacheKind::Device => CacheKind::Device,
-            common::mem::CacheKind::Normal => CacheKind::Normal,
-            common::mem::CacheKind::NoCache => CacheKind::NoCache,
-        }
+impl<T, const N: usize> core::ops::IndexMut<usize> for PageAligned<[T; N]> {
+    fn index_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.0[idx]
     }
 }
 
-impl From<MapRangeConfig> for Tte {
-    fn from(value: MapRangeConfig) -> Self {
-        let mut tte = Tte::empty();
-        tte.set_is_valid(true);
-        tte.set_access();
-        tte.set_shareability(if value.cpu_share {
-            Shareability::InnerShareable
-        } else {
-            Shareability::NonShareable
-        });
-        tte.set_access_permission(value.access.into());
-        tte.set_attr_index(CacheKind::from(value.cache).mair_idx());
-        match value.access {
-            AccessKind::Read | AccessKind::ReadWrite => tte.set_executable(false),
-            _ => {}
-        }
-        tte
-    }
-}
+/// Level-0 boot page table (shared between TTBR0 and TTBR1).
+#[unsafe(link_section = ".data.boot_page_table")]
+static mut BOOT_PT_L0: PageAligned<[A64PageEntry; 512]> =
+    PageAligned::new([A64PageEntry::empty(); 512]);
 
-pub fn new_table<'a>(
-    access: &mut impl Access,
-) -> Result<Table<'a>, page_table_generic::PagingError> {
-    PageTableRef::create_empty(access)
-}
+/// Level-1 page table for the identity map / kernel map.
+///
+/// Because TTBR0 and TTBR1 share the same L0 table, a single L1 table
+/// covers both the low (identity) and high (virtual kernel) windows.
+#[unsafe(link_section = ".data.boot_page_table")]
+static mut BOOT_PT_L1: PageAligned<[A64PageEntry; 512]> =
+    PageAligned::new([A64PageEntry::empty(); 512]);
 
-pub(crate) fn init_mmu() {
-    let mut alloc = Allocator {};
-    let access = &mut alloc;
-    let mut table = Table::create_empty(access).unwrap();
-
-    for region in regions_to_map() {
-        unsafe {
-            debug!(
-                "Map `{:<12}`: {:?} | [{:#p}, {:#p}) -> [{:#x}, {:#x})",
-                region.name,
-                region.access,
-                region.vaddr,
-                region.vaddr.add(region.size),
-                region.paddr,
-                region.paddr + region.size
-            );
-
-            table
-                .map(
-                    MapConfig::new(
-                        region.vaddr.into(),
-                        region.paddr.into(),
-                        region.size,
-                        region.into(),
-                        true,
-                        false,
-                    ),
-                    access,
-                )
-                .unwrap()
-        };
-    }
-    let addr = table.paddr().raw();
-    KERNAL_TABLE.lock().replace(table);
-
-    debug!("MMU initialized with table at {addr:#x}");
-    if CurrentEL.read(CurrentEL::EL) == 1 {
-        TTBR1_EL1.set_baddr(addr as _);
-        TTBR0_EL1.set_baddr(0);
-    } else {
-        TTBR0_EL2.set_baddr(addr as _);
-    }
-    flush_tlb(None);
-}
-
-pub fn mmap(region: MapRangeConfig) -> Result<(), page_table_generic::PagingError> {
-    let mut g = KERNAL_TABLE.lock();
-    let table = g.as_mut().expect("MMU not initialized");
-    let mut alloc = Allocator {};
-    let access = &mut alloc;
-    unsafe {
-        debug!(
-            "Map `{:<12}`: {:?} | [{:#p}, {:#p}) -> [{:#x}, {:#x})",
-            region.name,
-            region.access,
-            region.vaddr,
-            region.vaddr.add(region.size),
-            region.paddr,
-            region.paddr + region.size
-        );
-
-        table.map(
-            MapConfig::new(
-                region.vaddr.into(),
-                region.paddr.into(),
-                region.size,
-                region.into(),
-                true,
-                true,
-            ),
-            access,
-        )
-    }
-}
-
-pub fn table_map(
-    table: PageTable,
-    access: &mut impl Access,
-    region: MapRangeConfig,
-) -> Result<(), page_table_generic::PagingError> {
-    let mut table: PageTableRef<'_, TableImpl> = PageTableRef::root_from_addr(table.addr.into());
+/// Build the minimal boot page tables required to switch the MMU on.
+///
+/// The two tables form a two-level walk:
+/// ```text
+/// TTBR0/TTBR1 → BOOT_PT_L0[0] → BOOT_PT_L1
+///                  L1[0] → 0x0000_0000  (1 GiB, Device)
+///                  L1[1] → 0x4000_0000  (1 GiB, Normal RWX)
+/// ```
+///
+/// The same L0 table is used for both TTBR0 (low addresses) and TTBR1
+/// (high addresses) because the kernel virtual base has the same L0/L1
+/// indices as its physical address when the top 16 bits are masked off.
+///
+/// # Safety
+///
+/// Must be called before the MMU is enabled.  All memory accesses use
+/// physical addresses obtained via `adrp`/`add` (PC-relative).
+#[unsafe(link_section = ".idmap.text")]
+pub unsafe fn create_boot_page_tables() {
+    // Obtain physical addresses of the static arrays via PC-relative
+    // addressing – mandatory before the MMU is on.
+    let l0_pa: usize;
+    let l1_pa: usize;
 
     unsafe {
-        debug!(
-            "Map `{:<12}`: {:?} | [{:#p}, {:#p}) -> [{:#x}, {:#x})",
-            region.name,
-            region.access,
-            region.vaddr,
-            region.vaddr.add(region.size),
-            region.paddr,
-            region.paddr + region.size
+        core::arch::asm!(
+            "adrp {out}, {sym}",
+            "add  {out}, {out}, :lo12:{sym}",
+            sym = sym BOOT_PT_L0,
+            out = out(reg) l0_pa,
+            options(pure, nomem, nostack),
         );
-
-        table.map(
-            MapConfig::new(
-                region.vaddr.into(),
-                region.paddr.into(),
-                region.size,
-                region.into(),
-                true,
-                true,
-            ),
-            access,
-        )
+        core::arch::asm!(
+            "adrp {out}, {sym}",
+            "add  {out}, {out}, :lo12:{sym}",
+            sym = sym BOOT_PT_L1,
+            out = out(reg) l1_pa,
+            options(pure, nomem, nostack),
+        );
     }
+
+    // Safety: raw pointer writes to physical addresses obtained above.
+    let l0 = unsafe { &mut *(l0_pa as *mut [A64PageEntry; 512]) };
+    let l1 = unsafe { &mut *(l1_pa as *mut [A64PageEntry; 512]) };
+
+    // L0[0] → L1 table
+    l0[0] = A64PageEntry::new_table(PhysAddr::from(l1_pa));
+
+    // L1[0]: identity-map the first 1 GiB as Device memory.
+    // Device memory needs both read and write access so that early boot code
+    // can interact with UART and other MMIO peripherals in this range.
+    l1[0] = A64PageEntry::new_page(
+        PhysAddr::from(0usize),
+        PagingFlags::READ | PagingFlags::WRITE | PagingFlags::DEVICE,
+        true, // 1 GiB block
+    );
+
+    // L1[1]: map the second 1 GiB (0x4000_0000 … 0x8000_0000) as Normal
+    // memory with full permissions.  The kernel image lives here.
+    l1[1] = A64PageEntry::new_page(
+        PhysAddr::from(0x4000_0000usize),
+        PagingFlags::READ | PagingFlags::WRITE | PagingFlags::EXECUTE,
+        true, // 1 GiB block
+    );
+
+    // Ensure all page table writes are visible before enabling the MMU.
+    barrier::dsb(barrier::SY);
 }
 
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-pub struct Tte(TTE4K48);
-
-impl Tte {
-    pub fn empty() -> Self {
-        let mut tte = TTE4K48::new_table(0);
-        tte.set_is_valid(true);
-        tte.set_access();
-        tte.set_shareability(Shareability::InnerShareable);
-
-        Self(tte)
+/// Configure MMU registers and enable the MMU.
+///
+/// Sets `MAIR_EL1`, `TCR_EL1`, `TTBR0_EL1`, `TTBR1_EL1` and then turns
+/// the MMU on via `SCTLR_EL1`.
+///
+/// # Safety
+///
+/// Must be called after [`create_boot_page_tables`] and before any code
+/// that relies on virtual addresses.
+#[unsafe(link_section = ".idmap.text")]
+pub unsafe fn init_mmu() {
+    // Obtain physical address of L0 page table via PC-relative addressing.
+    let root_pa: usize;
+    unsafe {
+        core::arch::asm!(
+            "adrp {out}, {sym}",
+            "add  {out}, {out}, :lo12:{sym}",
+            sym = sym BOOT_PT_L0,
+            out = out(reg) root_pa,
+            options(pure, nomem, nostack),
+        );
     }
+
+    // Program memory attributes.
+    MAIR_EL1.set(Arm64MemAttr::MAIR_VALUE);
+
+    // Configure TCR_EL1: 4 KiB granule, 48-bit VA, 48-bit PA, inner-shareable
+    // write-back cacheable walks for both TTBR0 (T0SZ=16) and TTBR1 (T1SZ=16).
+    let tcr_flags0 = TCR_EL1::EPD0::EnableTTBR0Walks
+        + TCR_EL1::TG0::KiB_4
+        + TCR_EL1::SH0::Inner
+        + TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
+        + TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
+        + TCR_EL1::T0SZ.val(16);
+    let tcr_flags1 = TCR_EL1::EPD1::EnableTTBR1Walks
+        + TCR_EL1::TG1::KiB_4
+        + TCR_EL1::SH1::Inner
+        + TCR_EL1::ORGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable
+        + TCR_EL1::IRGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable
+        + TCR_EL1::T1SZ.val(16);
+    TCR_EL1.write(TCR_EL1::IPS::Bits_48 + tcr_flags0 + tcr_flags1);
+    barrier::isb(barrier::SY);
+
+    // Point both TTBR0 and TTBR1 at the same L0 table so that low (identity)
+    // and high (kernel) virtual addresses are both accessible right after the
+    // MMU is enabled.
+    let root_pa_u64 = root_pa as u64;
+    TTBR0_EL1.set(root_pa_u64);
+    TTBR1_EL1.set(root_pa_u64);
+
+    // Flush the entire TLB before enabling the MMU.
+    karch::flush_tlb(None);
+
+    // Enable the MMU and turn on I-cache and D-cache.
+    SCTLR_EL1.modify(SCTLR_EL1::M::Enable + SCTLR_EL1::C::Cacheable + SCTLR_EL1::I::Cacheable);
+    barrier::isb(barrier::SY);
 }
-
-impl Deref for Tte {
-    type Target = TTE4K48;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Tte {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl core::fmt::Debug for Tte {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "PTE {:?}", self.paddr())
-    }
-}
-
-impl PTEGeneric for Tte {
-    #[inline(always)]
-    fn valid(&self) -> bool {
-        self.0.is_valid()
-    }
-
-    #[inline(always)]
-    fn paddr(&self) -> PhysAddr {
-        self.0.address().into()
-    }
-
-    #[inline(always)]
-    fn set_paddr(&mut self, paddr: PhysAddr) {
-        self.0.set_address(paddr.raw() as _);
-    }
-
-    #[inline(always)]
-    fn set_valid(&mut self, valid: bool) {
-        self.0.set_is_valid(valid);
-    }
-
-    #[inline(always)]
-    fn is_huge(&self) -> bool {
-        self.0.is_block()
-    }
-
-    #[inline(always)]
-    fn set_is_huge(&mut self, is_block: bool) {
-        if is_block {
-            self.0.set_is_block();
-        } else {
-            self.0.set_is_table();
-        }
-    }
-}
-
-pub type Table<'a> = PageTableRef<'a, TableImpl>;
-
-#[derive(Clone, Copy)]
-pub struct TableImpl;
-
-impl TableGeneric for TableImpl {
-    type PTE = Tte;
-
-    fn flush(vaddr: Option<VirtAddr>) {
-        flush_tlb(vaddr.map(|o| o.raw().into()));
-    }
-}
-
-pub use super::super::el::get_kernal_table;
-pub use super::super::el::set_kernal_table;
 
 

@@ -1,6 +1,7 @@
 OUTPUT_ARCH(%ARCH%)
 
-BASE_ADDRESS = %KERNEL_IMAGE_VADDR%;
+PAGE_SIZE = 0x1000;
+BASE_ADDRESS = %KERNEL_BASE%;
 
 SECTIONS
 {
@@ -37,12 +38,6 @@ SECTIONS
         __init_array_start = .;
         *(.init_array .init_array.*)
         __init_array_end = .;
-    }
-
-    .boot_loader : ALIGN(PAGE_SIZE) {
-        __boot_loader_start = .;
-        KEEP(*(.boot_loader))
-        __boot_loader_end = .;
     }
 
     .data : ALIGN(4K) {
@@ -113,9 +108,3 @@ SECTIONS
         *(.comment) *(.gnu*) *(.note*) *(.eh_frame*)
     }
 }
-
-EXTERN(__pie_boot_default_secondary);
-EXTERN(__somehal_handle_irq_default);
-
-PROVIDE(__pie_boot_secondary = __pie_boot_default_secondary);
-PROVIDE(__somehal_handle_irq = __somehal_handle_irq_default);

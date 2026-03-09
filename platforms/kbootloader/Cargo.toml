@@ -16,6 +16,7 @@ macros = { workspace = true }
 # Architecture-specific dependencies
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64-cpu = "10.0"
-aarch64-cpu-ext = "0.1"
-kasm-aarch64 = {workspace = true}
-smccc = "0.2"
+karch = { workspace = true }
+page_table = { workspace = true }
+memaddr = { workspace = true }
+kplat = { workspace = true, features = ["smp"] }

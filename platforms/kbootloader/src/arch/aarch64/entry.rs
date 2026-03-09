@@ -3,223 +3,206 @@
 // See LICENSES for license details.
 
 //! AArch64 position-independent boot entry.
+//!
+//! Boot flow
+//! ---------
+//! ```text
+//! _start  (.head.text)
+//!   └─ primary_entry  (.idmap.text)
+//!        ├─ preserve_boot_args()   – save x0-x3 (DTB, …) via adrp
+//!        ├─ switch_to_el1()        – EL3/EL2 → EL1 transition
+//!        ├─ enable_fp()            – enable FP/SIMD
+//!        ├─ create_boot_page_tables() – build idmap + kernel high map
+//!        ├─ init_mmu()             – set MAIR/TCR/TTBR, enable MMU
+//!        └─ __primary_switched()  (virtual address)
+//!             ├─ zero BSS
+//!             └─ kplat::entry(cpu_id, dtb)
+//! ```
 
-use core::{
-    arch::naked_asm,
-    mem::{offset_of, size_of},
-};
+use core::arch::naked_asm;
 
-use aarch64_cpu_ext::cache::{CacheOp, dcache_all};
-use aarch64_cpu::{asm::barrier, registers::*};
-
-use kasm_aarch64::{self as kasm, adr_l};
-use pie_boot_loader_aarch64::el1::{set_table, setup_sctlr, setup_table_regs};
+use aarch64_cpu::registers::*;
 use kbuild_config::{BOOT_STACK_SIZE, PHYS_VIRT_OFFSET};
-use super::bootargs::EarlyBootArgs;
+use macros::section_idmap_text;
 
-use crate::{boot_info, start_code};
-use super::page::{KLINER_OFFSET, PAGE_SIZE};
+use super::{el, mmu};
 
-macro_rules! sym_lma {
-    ($sym:expr) => {{
-        #[allow(unused_unsafe)]
-        unsafe{
-            let out: usize;
-            core::arch::asm!(
-                "adrp {r}, {s}",
-                "add  {r}, {r}, :lo12:{s}",
-                r = out(reg) out,
-                s = sym $sym,
-            );
-            out
-        }
-    }};
-}
-
-#[unsafe(link_section = ".bss.stack")]
-static mut BOOT_STACK: [u8; BOOT_STACK_SIZE] = [0; BOOT_STACK_SIZE];
-#[unsafe(link_section = ".data")]
-static mut UART_DEBUG: usize = 0;
-
+// Linux ARM64 Boot Protocol image flags.
 const FLAG_LE: usize = 0b0;
 const FLAG_PAGE_SIZE_4K: usize = 0b10;
 const FLAG_ANY_MEM: usize = 0b1000;
 
+/// Boot stack for the primary CPU.
+#[unsafe(link_section = ".bss.stack")]
+static mut BOOT_STACK: [u8; BOOT_STACK_SIZE] = [0; BOOT_STACK_SIZE];
+
+/// Storage for the boot arguments passed in x0-x3 by firmware/bootloader.
+#[unsafe(link_section = ".data")]
+static mut SAVED_BOOT_ARGS: [u64; 4] = [0; 4];
+
+/// Linux ARM64 Boot Protocol header followed by a branch to `primary_entry`.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".head.text")]
 pub unsafe extern "C" fn _start() -> ! {
     naked_asm!(
-        // Linux ARM64 Boot Protocol Header
-        "add     x13, x18, #0x16",       // 'MZ' magic
-        "bl {entry}",
-        // text_offset
-        ".quad 0",
-        // image_size
-        ".quad __kernel_load_end - _start",
-        // flags
-        ".quad {flags}",
-        // Reserved fields
-        ".quad 0",
-        ".quad 0",
-        ".quad 0",
-        // magic - yes 0x644d5241 is the same as ASCII string "ARM\x64"
-        ".ascii \"ARM\\x64\"",
-        // Another reserved field at the end of the header
-        ".byte 0, 0, 0, 0",
+        "add     x13, x18, #0x16",        // "MZ" magic
+        "bl      {entry}",                 // branch to kernel start
+        ".quad   0",                       // image load offset (little-endian)
+        ".quad   _ekernel - _start",       // effective image size
+        ".quad   {flags}",                 // kernel flags
+        ".quad   0",                       // reserved
+        ".quad   0",                       // reserved
+        ".quad   0",                       // reserved
+        ".ascii  \"ARM\\x64\"",            // magic number
+        ".long   0",                       // reserved (PE COFF offset)
         flags = const FLAG_LE | FLAG_PAGE_SIZE_4K | FLAG_ANY_MEM,
         entry = sym primary_entry,
     )
 }
 
+/// Primary CPU early boot entry (runs before MMU is enabled).
+///
+/// All code here is position-independent – only PC-relative addressing is
+/// used for data, except for `ldr x8, =sym` literal-pool loads which
+/// intentionally load the *linked* virtual address so that the `br x8`
+/// after MMU-enable jumps to the correct high-virtual-address symbol.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-#[section_idmap_text]
+#[unsafe(link_section = ".idmap.text")]
 pub unsafe extern "C" fn primary_entry() -> ! {
     naked_asm!(
-    "
-    bl  {preserve_boot_args}",
-    adr_l!(x0, "{boot_args}"),
-    adr_l!(x8, "{loader}"),
-    "
-    br   x8",
-        preserve_boot_args = sym preserve_boot_args,
-        boot_args = sym crate::BOOT_ARGS,
-        loader = sym crate::loader::LOADER_BIN,
+        // Capture CPU ID from MPIDR_EL1[23:0] (Aff2|Aff1|Aff0) and DTB
+        // pointer before any call clobbers them.  This simplified affinity
+        // masking follows the same convention used by other x-kernel platforms
+        // (e.g. aarch64-qemu-virt) and is sufficient for typical SMP
+        // configurations where Aff3 is zero.
+        "mrs     x19, mpidr_el1",
+        "and     x19, x19, #0xffffff",   // CPU affinity Aff2|Aff1|Aff0
+        "mov     x20, x0",               // save DTB physical address
+
+        // Save firmware boot arguments (x0-x3) to SAVED_BOOT_ARGS via adrp.
+        "bl      {preserve_boot_args}",
+
+        // Set up the early boot stack using PC-relative addressing.
+        "adrp    x8, {boot_stack}",
+        "add     x8, x8, :lo12:{boot_stack}",
+        "add     x8, x8, {boot_stack_size}",
+        "mov     sp, x8",
+
+        // Drop to EL1 (no-op when already at EL1).
+        "bl      {switch_to_el1}",
+
+        // Enable FP/SIMD so that Rust code can use float registers.
+        "bl      {enable_fp}",
+
+        // Build the two-level boot page tables (idmap + kernel high map).
+        "bl      {create_boot_page_tables}",
+
+        // Program MAIR/TCR/TTBR and enable the MMU.
+        "bl      {init_mmu}",
+
+        // Switch the stack pointer to its high virtual address.
+        "mov     x8, {phys_virt_offset}",
+        "add     sp, sp, x8",
+
+        // Restore cpu_id and DTB for __primary_switched.
+        "mov     x0, x19",
+        "mov     x1, x20",
+
+        // Jump to the virtual address of __primary_switched.
+        // `ldr x8, =sym` loads the *linked* VMA from the literal pool so
+        // that the branch targets the high-VA mapping set up above.
+        "ldr     x8, ={primary_switched}",
+        "br      x8",
+
+        preserve_boot_args      = sym preserve_boot_args,
+        boot_stack              = sym BOOT_STACK,
+        boot_stack_size         = const BOOT_STACK_SIZE,
+        switch_to_el1           = sym el::switch_to_el1,
+        enable_fp               = sym enable_fp,
+        create_boot_page_tables = sym mmu::create_boot_page_tables,
+        init_mmu                = sym mmu::init_mmu,
+        phys_virt_offset        = const PHYS_VIRT_OFFSET,
+        primary_switched        = sym __primary_switched,
     )
 }
 
+/// Save x0-x3 (firmware boot arguments) to [`SAVED_BOOT_ARGS`].
+///
+/// Uses PC-relative addressing so this can run before the MMU is on.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-#[section_idmap_text]
+#[unsafe(link_section = ".idmap.text")]
 pub unsafe extern "C" fn preserve_boot_args() {
     naked_asm!(
-    adr_l!(x8, "{boot_args}"), // record the contents of
-    "
-	stp	x0,  x1, [x8]			// x0 .. x3 at kernel entry
-	stp	x2,  x3, [x8, #16]
-
-    LDR  x0,  ={virt_entry}
-    str  x0,  [x8, {args_of_entry_vma}]",
-    adr_l!(x0, "_start"),
-    "
-    str x0,  [x8, {args_of_kimage_addr_lma}]
-
-    LDR  x0,  =_start
-    str x0,  [x8, {args_of_kimage_addr_vma}]",
-
-    adr_l!(x0, "__cpu0_stack_top"),
-    "
-    str x0,  [x8, {args_of_stack_top_lma}]",
-    "
-    LDR x0,  =__cpu0_stack_top
-    str x0,  [x8, {args_of_stack_top_vma}]
-    ",
-
-
-    adr_l!(x0, "__kernel_code_end"),
-    "
-    str x0,  [x8, {args_of_kcode_end}]
-
-    // set EL
-    mov x0, {el_value}              // Set target EL based on feature
-    str x0,  [x8, {args_of_el}]
-
-    LDR x0, ={kliner_offset}
-    str x0,  [x8, {args_of_kliner_offset}]
-
-    mov x0, {page_size}
-    str x0,  [x8, {args_of_page_size}]
-
-    mov x0, #1
-    str x0,  [x8, {args_of_debug}]
-
-	dmb	sy				// needed before dc ivac with
-						// MMU off
-    mov x0, x8
-	add	x1, x0, {boot_arg_size}
-	b	{dcache_inval_poc}		// tail call
-        ",
-    boot_args = sym super::bootargs::BOOT_ARGS,
-    virt_entry = sym switch_sp,
-    args_of_entry_vma = const  offset_of!(EarlyBootArgs, virt_entry),
-    args_of_kimage_addr_lma = const  offset_of!(EarlyBootArgs, kimage_addr_lma),
-    args_of_kimage_addr_vma = const  offset_of!(EarlyBootArgs, kimage_addr_vma),
-    args_of_stack_top_lma = const  offset_of!(EarlyBootArgs, stack_top_lma),
-    args_of_stack_top_vma = const  offset_of!(EarlyBootArgs, stack_top_vma),
-    args_of_kcode_end = const  offset_of!(EarlyBootArgs, kcode_end),
-    args_of_el = const  offset_of!(EarlyBootArgs, el),
-    el_value = const if cfg!(feature = "hv") { 2 } else { 1 },
-    kliner_offset = const KLINER_OFFSET,
-    args_of_kliner_offset = const offset_of!(EarlyBootArgs, kliner_offset),
-    page_size = const PAGE_SIZE,
-    args_of_page_size = const offset_of!(EarlyBootArgs, page_size),
-    args_of_debug = const offset_of!(EarlyBootArgs, debug),
-    dcache_inval_poc = sym cache::__dcache_inval_poc,
-    boot_arg_size = const size_of::<EarlyBootArgs>()
+        // Get the physical address of SAVED_BOOT_ARGS via adrp/add.
+        "adrp    x8, {saved_args}",
+        "add     x8, x8, :lo12:{saved_args}",
+        // Store x0..x3.
+        "stp     x0, x1, [x8]",
+        "stp     x2, x3, [x8, #16]",
+        // Full system barrier so the stores complete before the MMU is enabled.
+        "dmb     sy",
+        "ret",
+        saved_args = sym SAVED_BOOT_ARGS,
     )
 }
 
+/// Secondary CPU boot entry.
+///
+/// Called with `x0` = top of a pre-allocated stack.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-#[section_idmap_text]
-pub unsafe extern "C" fn _start_secondary(_stack_top: usize) -> ! {
+#[unsafe(link_section = ".idmap.text")]
+pub unsafe extern "C" fn _start_secondary() -> ! {
     naked_asm!(
-        "
-        mrs     x19, mpidr_el1
-        and     x19, x19, #0xffffff     // get current CPU id
-        mov     x20, x0
-
-        mov     sp, x20
-        mov     x0, x20
-        bl      {switch_to_elx}
-        bl      {enable_fp}
-        bl      {init_mmu} // return va_offset x0
-        add     sp, sp, x0
-
-        mov     x0, x19                 // call_secondary_main(cpu_id)
-        ldr     x8, =__pie_boot_secondary
-        blr     x8
-        b      .",
-
-        // t = sym test_print,
-        switch_to_elx = sym el::switch_to_elx,
-        init_mmu = sym init_mmu,
-        enable_fp = sym enable_fp,
+        "mrs     x19, mpidr_el1",
+        "and     x19, x19, #0xffffff",   // CPU affinity Aff2|Aff1|Aff0 (see primary_entry)
+        "mov     sp, x0",                // stack passed in x0
+        "bl      {switch_to_el1}",
+        "bl      {enable_fp}",
+        "bl      {init_mmu}",
+        "mov     x8, {phys_virt_offset}",
+        "add     sp, sp, x8",
+        "mov     x0, x19",               // cpu_id
+        "ldr     x8, ={entry_secondary}",
+        "br      x8",
+        switch_to_el1    = sym el::switch_to_el1,
+        enable_fp        = sym enable_fp,
+        init_mmu         = sym mmu::init_mmu,
+        phys_virt_offset = const PHYS_VIRT_OFFSET,
+        entry_secondary  = sym kplat::entry_secondary,
     )
 }
 
+/// Enable FP/SIMD by clearing traps in `CPACR_EL1`.
 #[section_idmap_text]
 fn enable_fp() {
     CPACR_EL1.write(CPACR_EL1::FPEN::TrapNothing);
-    barrier::isb(barrier::SY);
+    aarch64_cpu::asm::barrier::isb(aarch64_cpu::asm::barrier::SY);
 }
 
-#[section_idmap_text]
-fn init_mmu() -> usize {
-    dcache_all(CacheOp::Invalidate);
-    setup_table_regs();
+/// Post-MMU entry point – runs at the kernel's high virtual address.
+///
+/// Zeroes BSS, then calls [`kplat::entry`] with the boot CPU id and DTB
+/// physical address.
+///
+/// # Safety
+///
+/// Must only be called once, from [`primary_entry`], after the MMU has been
+/// enabled and the stack pointer adjusted to a virtual address.
+pub unsafe extern "C" fn __primary_switched(cpu_id: usize, dtb_paddr: usize) -> ! {
+    // Zero BSS.
+    unsafe extern "C" {
+        fn _sbss();
+        fn _ebss();
+    }
+    unsafe {
+        let bss_start = _sbss as *const () as usize;
+        let bss_end = _ebss as *const () as usize;
+        core::slice::from_raw_parts_mut(bss_start as *mut u8, bss_end - bss_start).fill(0);
+    }
 
-    let addr = boot_info().pg_start as usize;
-    set_table(addr);
-    setup_sctlr();
-
-    boot_info().kcode_offset()
-}
-
-#[unsafe(naked)]
-unsafe extern "C" fn switch_sp(_args: usize) -> ! {
-    naked_asm!(
-        "
-        adrp x8, __cpu0_stack_top
-        add  x8, x8, :lo12:__cpu0_stack_top
-        mov  sp, x8
-        bl   {next}
-        ",
-        next =sym crate::common::entry::virt_entry,
-    )
-}
-
-pub fn setup_exception_vectors() {
-    trap::setup();
+    kplat::entry(cpu_id, dtb_paddr)
 }

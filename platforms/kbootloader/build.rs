@@ -1,5 +1,9 @@
 use std::{env, fs, path::PathBuf};
 
+fn out_dir() -> PathBuf {
+    PathBuf::from(env::var("OUT_DIR").unwrap())
+}
+
 fn main() {
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 
@@ -13,7 +17,7 @@ fn main() {
         println!("cargo::rustc-cfg=hard_float");
     }
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_dir = out_dir();
 
     // Read linker script template
     let linker_script_src =
