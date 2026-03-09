@@ -152,6 +152,7 @@ pub unsafe extern "C" fn preserve_boot_args() {
 /// Secondary CPU boot entry.
 ///
 /// Called with `x0` = top of a pre-allocated stack.
+#[cfg(feature = "smp")]
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".idmap.text")]

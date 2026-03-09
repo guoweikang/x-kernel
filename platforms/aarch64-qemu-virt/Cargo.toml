@@ -11,7 +11,7 @@ repository.workspace = true
 [features]
 fp-simd = ["kcpu/fp-simd", "kbootloader/fp-simd"]
 rtc = []
-smp = ["kplat/smp"]
+smp = ["kplat/smp", "kbootloader/smp"]
 nmi = ["aarch64-peripherals/nmi-pmu", "kplat/nmi", "pmu"]
 pmu = ["kplat/pmu"]
 
@@ -23,7 +23,7 @@ kcpu = { workspace = true }
 karch = { workspace = true }
 kplat = { workspace = true }
 kbuild_config = { workspace = true }
-kbootloader = { workspace = true, optional = true }
+kbootloader = { workspace = true }
 
 [package.metadata.docs.rs]
 targets = ["aarch64-unknown-none"]
