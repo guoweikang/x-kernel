@@ -8,7 +8,6 @@
 #[macro_use]
 extern crate kplat;
 
-mod boot;
 mod init;
 mod mem;
 mod power;
