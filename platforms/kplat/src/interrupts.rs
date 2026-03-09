@@ -36,3 +36,28 @@ pub trait IntrManager {
     /// Sets the priority for the given interrupt.
     fn set_prio(id: usize, prio: u8);
 }
+
+// Platform-provided MSI-X helpers (x86_64 only).
+// The implementations live in the platform crate (e.g. x86_64-qemu-virt)
+// and are linked in via the exported symbol names below.
+#[cfg(target_arch = "x86_64")]
+unsafe extern "Rust" {
+    #[link_name = "__kplat_alloc_msix_vector"]
+    fn __alloc_msix_vector_impl() -> Option<u8>;
+    #[link_name = "__kplat_current_apic_id"]
+    fn __current_apic_id_impl() -> u8;
+}
+
+/// Allocates the next available MSI-X CPU vector.
+///
+/// Returns `None` when all vectors are exhausted.
+#[cfg(target_arch = "x86_64")]
+pub fn alloc_msix_vector() -> Option<u8> {
+    unsafe { __alloc_msix_vector_impl() }
+}
+
+/// Returns the APIC ID of the current logical CPU.
+#[cfg(target_arch = "x86_64")]
+pub fn current_apic_id() -> u8 {
+    unsafe { __current_apic_id_impl() }
+}

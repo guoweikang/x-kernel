@@ -11,6 +11,9 @@ pub use kbuild_config::IPI_IRQ;
 use kcpu::excp::{IRQ, register_trap_handler};
 #[cfg(feature = "ipi")]
 pub use kplat::interrupts::{TargetCpu, notify_cpu};
+// Platform-provided functions for MSI-X support (x86_64 only).
+#[cfg(target_arch = "x86_64")]
+pub use kplat::interrupts::{alloc_msix_vector, current_apic_id};
 pub use kplat::interrupts::{
     dispatch_irq, enable, reg_handler as register, set_prio, unreg_handler as unregister,
 };
