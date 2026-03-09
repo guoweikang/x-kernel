@@ -2,11 +2,18 @@
 // Copyright 2025 KylinSoft Co., Ltd. <https://www.kylinos.cn/>
 // See LICENSES for license details.
 
+mod link;
+
 //! Procedural macros for kernel utility helpers.
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::{Error, Item, ItemFn, ItemMod, parse_macro_input};
+
+#[proc_macro_attribute]
+pub fn section_idmap_text(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    link::section_impl(quote!(section = ".idmap.text").into(), item)
+}
 
 /// Register a constructor function to be called before `main`.
 ///

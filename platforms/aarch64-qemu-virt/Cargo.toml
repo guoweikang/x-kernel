@@ -14,6 +14,7 @@ rtc = []
 smp = ["kplat/smp"]
 nmi = ["aarch64-peripherals/nmi-pmu", "kplat/nmi", "pmu"]
 pmu = ["kplat/pmu"]
+kbootloader = ["dep:kbootloader"]
 
 [dependencies]
 log = "0.4"
@@ -23,6 +24,7 @@ kcpu = { workspace = true }
 karch = { workspace = true }
 kplat = { workspace = true }
 kbuild_config = { workspace = true }
+kbootloader = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 targets = ["aarch64-unknown-none"]
