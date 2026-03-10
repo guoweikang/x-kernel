@@ -11,35 +11,7 @@ use syn::{Error, FnArg, ItemFn, ItemTrait, ReturnType, TraitItem};
 fn err_ts(e: Error) -> TokenStream {
     e.to_compile_error().into()
 }
-fn check_fn(t: TokenStream, cnt: usize, exp_name: &str, msg: &str) -> TokenStream {
-    let f = syn::parse_macro_input!(t as ItemFn);
-    let mut bad = if let ReturnType::Type(_, ty) = &f.sig.output {
-        quote! { #ty }.to_string() != "!"
-    } else {
-        true
-    };
-    let inputs = &f.sig.inputs;
-    // for i in inputs.iter() {
-    // if let FnArg::Typed(pt) = i {
-    // if quote! { #pt.ty }.to_string() != "usize" {
-    // bad = true;
-    // break;
-    // }
-    // }
-    // }
-    if inputs.len() != cnt {
-        bad = true;
-    }
-    if bad {
-        err_ts(Error::new(Span::call_site(), msg))
-    } else {
-        quote! {
-            #[unsafe(export_name = #exp_name)]
-            #f
-        }
-        .into()
-    }
-}
+
 /// Generates dispatch wrappers for a platform device interface trait.
 #[proc_macro_attribute]
 pub fn device_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
