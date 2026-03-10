@@ -40,32 +40,6 @@ fn check_fn(t: TokenStream, cnt: usize, exp_name: &str, msg: &str) -> TokenStrea
         .into()
     }
 }
-/// Marks the primary platform entry function.
-#[proc_macro_attribute]
-pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
-    if !attr.is_empty() {
-        return err_ts(Error::new(Span::call_site(), "Attr must be empty"));
-    }
-    check_fn(
-        item,
-        2,
-        "__kplat_main",
-        "Sign: fn(cpu: usize, arg: usize) -> !",
-    )
-}
-/// Marks the secondary CPU entry function (SMP only).
-#[proc_macro_attribute]
-pub fn secondary_main(attr: TokenStream, item: TokenStream) -> TokenStream {
-    if !attr.is_empty() {
-        return err_ts(Error::new(Span::call_site(), "Attr must be empty"));
-    }
-    check_fn(
-        item,
-        1,
-        "__kplat_secondary_main",
-        "Sign: fn(cpu: usize) -> !",
-    )
-}
 /// Generates dispatch wrappers for a platform device interface trait.
 #[proc_macro_attribute]
 pub fn device_interface(attr: TokenStream, item: TokenStream) -> TokenStream {

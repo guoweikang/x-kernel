@@ -16,7 +16,6 @@ struct BootHandlerImpl;
 #[impl_dev_interface]
 impl BootHandler for BootHandlerImpl {
     fn early_init(_cpu_id: usize, _dtb: usize) {
-        kcpu::boot::init_trap();
         aarch64_peripherals::pl011::early_init(p2v(pa!(UART_PADDR)));
         aarch64_peripherals::psci::init(PSCI_METHOD);
         aarch64_peripherals::generic_timer::early_init();
@@ -26,7 +25,6 @@ impl BootHandler for BootHandlerImpl {
 
     #[cfg(feature = "smp")]
     fn early_init_ap(_cpu_id: usize) {
-        kcpu::boot::init_trap();
     }
 
     fn final_init(_cpu_id: usize, _dtb: usize) {

@@ -7,6 +7,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use kbuild_config::{CPU_NUM, TASK_STACK_SIZE};
 use khal::mem::{VirtAddr, v2p};
+use kbootloader::{register_boot_init, SECOND_KERNEL_ENTRY};
 
 #[unsafe(link_section = ".bss.stack")]
 static mut SECONDARY_BOOT_STACK: [[u8; TASK_STACK_SIZE]; CPU_NUM - 1] =
@@ -38,7 +39,7 @@ pub fn start_secondary_cpus(primary_cpu_id: usize) {
 /// The main entry point of the runtime for secondary cores.
 ///
 /// It is called from the bootstrapping code in the specific platform crate.
-#[kplat::secondary_main]
+#[register_boot_init(SECOND_KERNEL_ENTRY)]
 pub fn rust_main_secondary(cpu_id: usize) -> ! {
     khal::percpu::init_secondary(cpu_id);
     khal::early_init_secondary(cpu_id);

@@ -6,7 +6,6 @@
 
 mod ctx;
 
-pub mod boot;
 pub mod instrs;
 
 mod excp;
@@ -15,6 +14,25 @@ mod excp;
 pub mod userspace;
 
 pub use self::ctx::{ExceptionContext as TrapFrame, ExceptionContext, FpState, TaskContext};
+
+use kbootloader::{register_boot_init, INIT_TRAP};
+
+/// Initializes trap handling on the current CPU.
+///
+/// In detail, it initializes the exception vector, and sets `TTBR0_EL1` to 0 to
+/// block low address access.
+#[register_boot_init(INIT_TRAP)]
+pub fn init_trap() {
+    #[cfg(feature = "uspace")]
+    crate::userspace_common::init_exception_table();
+    unsafe extern "C" {
+        fn exception_vector_base();
+    }
+    unsafe {
+        karch::write_trap_vector_base(exception_vector_base as *const () as usize);
+        karch::write_user_page_table(0.into());
+    }
+}
 
 #[cfg(all(unittest, target_arch = "aarch64"))]
 pub mod tests_arch {
